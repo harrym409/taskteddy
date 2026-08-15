@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- TaskTeddy brand blue (matches C.primary #6384DB) -->
+    <color name="taskteddy_blue">#6384DB</color>
+</resources>

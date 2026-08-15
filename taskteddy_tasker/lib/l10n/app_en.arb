@@ -1,0 +1,1377 @@
+{
+  "@@locale": "en",
+  "appTagline": "Find tasks & earn money on your schedule!",
+  "@appTagline": {
+    "description": "Login screen tagline under the wordmark"
+  },
+  "navHome": "Home",
+  "@navHome": {
+    "description": "Bottom nav label for the dashboard tab"
+  },
+  "navBrowse": "Browse",
+  "@navBrowse": {
+    "description": "Bottom nav label for the browse tasks tab"
+  },
+  "navApplied": "Applied",
+  "@navApplied": {
+    "description": "Bottom nav label for the applications tab"
+  },
+  "navEarnings": "Earnings",
+  "@navEarnings": {
+    "description": "Bottom nav label for the wallet/earnings tab"
+  },
+  "navProfile": "Profile",
+  "@navProfile": {
+    "description": "Bottom nav label for the profile tab"
+  },
+  "goodMorning": "Good Morning",
+  "@goodMorning": {
+    "description": "Dashboard greeting before noon"
+  },
+  "goodAfternoon": "Good Afternoon",
+  "@goodAfternoon": {
+    "description": "Dashboard greeting in the afternoon"
+  },
+  "goodEvening": "Good Evening",
+  "@goodEvening": {
+    "description": "Dashboard greeting in the evening"
+  },
+  "statusOnline": "Online",
+  "@statusOnline": {
+    "description": "Availability chip when the tasker is available"
+  },
+  "statusOffline": "Offline",
+  "@statusOffline": {
+    "description": "Availability chip when the tasker is unavailable"
+  },
+  "dashAvailableForWork": "Available for new tasks",
+  "@dashAvailableForWork": {
+    "description": "Availability bar subtitle when the tasker is online"
+  },
+  "dashTapToGoOnline": "Tap to go online and receive tasks",
+  "@dashTapToGoOnline": {
+    "description": "Availability bar subtitle when the tasker is offline"
+  },
+  "dashStatReliability": "Reliability",
+  "@dashStatReliability": {
+    "description": "Stat chip label for the reliability percentage"
+  },
+  "dashStatLevel": "Level",
+  "@dashStatLevel": {
+    "description": "Stat chip label for the tasker reputation level"
+  },
+  "dashLevelNew": "New",
+  "@dashLevelNew": {
+    "description": "Default reputation level label when none is set"
+  },
+  "earningsOverview": "Earnings Overview",
+  "@earningsOverview": {
+    "description": "Dashboard earnings card title"
+  },
+  "wallet": "Wallet",
+  "@wallet": {
+    "description": "Wallet label / button"
+  },
+  "today": "Today",
+  "@today": {
+    "description": "Earnings period: today"
+  },
+  "thisWeek": "This Week",
+  "@thisWeek": {
+    "description": "Earnings period: this week"
+  },
+  "thisMonth": "This Month",
+  "@thisMonth": {
+    "description": "Earnings period: this month"
+  },
+  "statRating": "Rating",
+  "@statRating": {
+    "description": "Stat tile label for rating"
+  },
+  "statTasks": "Tasks",
+  "@statTasks": {
+    "description": "Stat tile label for tasks completed"
+  },
+  "statRank": "Rank",
+  "@statRank": {
+    "description": "Stat tile label for rank"
+  },
+  "statCoins": "Coins",
+  "@statCoins": {
+    "description": "Stat tile label for TaskCoins"
+  },
+  "qaBrowseTasks": "Browse Tasks",
+  "@qaBrowseTasks": {
+    "description": "Quick action / browse header"
+  },
+  "qaApplications": "Applications",
+  "@qaApplications": {
+    "description": "Quick action for applications"
+  },
+  "qaCompleted": "Completed",
+  "@qaCompleted": {
+    "description": "Quick action for completed tasks"
+  },
+  "qaMessages": "Messages",
+  "@qaMessages": {
+    "description": "Quick action for messages"
+  },
+  "tasksNearYou": "Tasks Near You",
+  "@tasksNearYou": {
+    "description": "Dashboard section header for nearby tasks"
+  },
+  "myActiveJobs": "My Active Jobs",
+  "@myActiveJobs": {
+    "description": "Dashboard section header for active jobs"
+  },
+  "myBookings": "My Bookings",
+  "@myBookings": {
+    "description": "Dashboard section header for bookings"
+  },
+  "seeAll": "See all",
+  "@seeAll": {
+    "description": "Link to open the full list"
+  },
+  "noTasksAvailable": "No tasks available right now",
+  "@noTasksAvailable": {
+    "description": "Empty state when no tasks are available"
+  },
+  "noActiveJobs": "No active jobs",
+  "@noActiveJobs": {
+    "description": "Empty state when there are no active jobs"
+  },
+  "searchTasksHint": "Search tasks, location...",
+  "@searchTasksHint": {
+    "description": "Browse search field placeholder"
+  },
+  "filterTasks": "Filter Tasks",
+  "@filterTasks": {
+    "description": "Browse filter sheet title"
+  },
+  "budgetRange": "Budget Range",
+  "@budgetRange": {
+    "description": "Browse filter section: budget range"
+  },
+  "applyFilters": "Apply Filters",
+  "@applyFilters": {
+    "description": "Button that applies the selected filters"
+  },
+  "budget": "Budget",
+  "@budget": {
+    "description": "Label for a task budget"
+  },
+  "quickApply": "Quick Apply",
+  "@quickApply": {
+    "description": "Button to quickly apply to a task"
+  },
+  "getVerifiedToApply": "Get verified to apply",
+  "@getVerifiedToApply": {
+    "description": "Button shown to unverified taskers on a task card"
+  },
+  "verificationRequired": "Verification required",
+  "@verificationRequired": {
+    "description": "Title of the KYC required dialog"
+  },
+  "completeKyc": "Complete your KYC verification to start applying to tasks.",
+  "@completeKyc": {
+    "description": "Body of the KYC required dialog"
+  },
+  "getVerified": "Get verified",
+  "@getVerified": {
+    "description": "Button to open verification"
+  },
+  "noTasksFound": "No tasks found",
+  "@noTasksFound": {
+    "description": "Empty state for browse results"
+  },
+  "tryAdjustingFilters": "Try adjusting filters or search",
+  "@tryAdjustingFilters": {
+    "description": "Hint under the browse empty state"
+  },
+  "loginOrSignup": "Log in or Sign up",
+  "@loginOrSignup": {
+    "description": "Heading on the login sheet"
+  },
+  "mobileNumber": "Mobile number",
+  "@mobileNumber": {
+    "description": "Phone field placeholder"
+  },
+  "enterValidMobile": "Enter a valid 10-digit mobile number",
+  "@enterValidMobile": {
+    "description": "Validation error for the phone field"
+  },
+  "enterFullOtp": "Please enter full 6-digit OTP",
+  "@enterFullOtp": {
+    "description": "Validation error for the OTP field"
+  },
+  "changeNumber": "Change number",
+  "@changeNumber": {
+    "description": "Button to change the phone number after OTP is sent"
+  },
+  "resendOtp": "Resend OTP",
+  "@resendOtp": {
+    "description": "Button to resend the OTP"
+  },
+  "resendInSeconds": "Resend in {seconds}s",
+  "@resendInSeconds": {
+    "description": "Countdown label before the OTP can be resent",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings screen title"
+  },
+  "language": "Language",
+  "@language": {
+    "description": "Settings row that opens the language chooser"
+  },
+  "selectLanguage": "Select Language",
+  "@selectLanguage": {
+    "description": "Title of the language chooser sheet"
+  },
+  "langEnglish": "English",
+  "@langEnglish": {
+    "description": "Language name: English"
+  },
+  "langHindi": "हिन्दी (Hindi)",
+  "@langHindi": {
+    "description": "Language name: Hindi"
+  },
+  "langPunjabi": "ਪੰਜਾਬੀ (Punjabi)",
+  "@langPunjabi": {
+    "description": "Language name: Punjabi"
+  },
+  "safety": "Safety",
+  "@safety": {
+    "description": "Settings section title for safety"
+  },
+  "blockedUsers": "Blocked Users",
+  "@blockedUsers": {
+    "description": "Settings row / screen title for blocked users"
+  },
+  "manage": "Manage",
+  "@manage": {
+    "description": "Trailing label meaning manage"
+  },
+  "noBlockedUsers": "No blocked users",
+  "@noBlockedUsers": {
+    "description": "Empty state for the blocked users screen"
+  },
+  "workPreferences": "WORK PREFERENCES",
+  "@workPreferences": {
+    "description": "Settings section header"
+  },
+  "availability": "Availability",
+  "@availability": {
+    "description": "Settings row for availability"
+  },
+  "actionApply": "Apply",
+  "@actionApply": {
+    "description": "Common action: apply"
+  },
+  "actionAccept": "Accept",
+  "@actionAccept": {
+    "description": "Common action: accept"
+  },
+  "actionDecline": "Decline",
+  "@actionDecline": {
+    "description": "Common action: decline"
+  },
+  "actionCancel": "Cancel",
+  "@actionCancel": {
+    "description": "Common action: cancel"
+  },
+  "actionSave": "Save",
+  "@actionSave": {
+    "description": "Common action: save"
+  },
+  "actionRetry": "Retry",
+  "@actionRetry": {
+    "description": "Common action: retry"
+  },
+  "actionContinue": "Continue",
+  "@actionContinue": {
+    "description": "Common action: continue"
+  },
+  "actionSubmit": "Submit",
+  "@actionSubmit": {
+    "description": "Common action: submit"
+  },
+  "actionOk": "OK",
+  "@actionOk": {
+    "description": "Common action: OK"
+  },
+  "actionYes": "Yes",
+  "@actionYes": {
+    "description": "Common action: yes"
+  },
+  "actionNo": "No",
+  "@actionNo": {
+    "description": "Common action: no"
+  },
+  "actionClose": "Close",
+  "@actionClose": {
+    "description": "Common action: close"
+  },
+  "actionReport": "Report",
+  "@actionReport": {
+    "description": "Common action: report"
+  },
+  "actionBlock": "Block",
+  "@actionBlock": {
+    "description": "Common action: block"
+  },
+  "actionOnMyWay": "On my way",
+  "@actionOnMyWay": {
+    "description": "Common action: on my way"
+  },
+  "bankTitle": "Bank & Payments",
+  "bankPayoutMethods": "Payout Methods",
+  "bankNoMethods": "No payout methods added yet.",
+  "bankSetDefaultSuccess": "{name} set as default payout method",
+  "@bankSetDefaultSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "bankAddPaymentMethod": "Add Payment Method",
+  "profileMyApplications": "My Applications",
+  "profileTotal": "Total",
+  "profilePending": "Pending",
+  "profileAccepted": "Accepted",
+  "profileCompleted": "Completed",
+  "@profileCompleted": { "description": "Applications tab: completed jobs" },
+  "profileRejected": "Rejected",
+  "profileAll": "All",
+  "profileNothingHere": "Nothing here yet",
+  "profileBrowseTasksStart": "Browse tasks to get started",
+  "profileWithdrawBid": "Withdraw Bid",
+  "profileWithdrawBidConfirm": "Are you sure you want to withdraw this bid?",
+  "profileWithdraw": "Withdraw",
+  "profileBidWithdrawn": "Bid withdrawn",
+  "profileCompleteTask": "Complete Task",
+  "profileCompleteTaskOtpPrompt": "Enter the OTP shared by the customer to complete this task.",
+  "profileOtp": "OTP",
+  "profileEnterOtp": "Enter OTP",
+  "chatClosed": "This chat is closed — the task is finished.",
+  "@chatClosed": { "description": "Banner in a chat whose task is finished" },
+  "walletMyWallet": "My Wallet",
+  "walletTotalBalance": "Total Balance",
+  "walletAvailable": "Available",
+  "walletEarnings": "Earnings",
+  "walletTransactions": "Transactions",
+  "walletWithdraw": "Withdraw",
+  "walletTasksDone": "Tasks Done",
+  "walletNoTransactions": "No transactions yet",
+  "@walletNoTransactions": {
+    "description": "Empty-state title on the wallet transactions tab"
+  },
+  "walletNoTransactionsBody": "Your earnings and withdrawals will appear here.",
+  "@walletNoTransactionsBody": {
+    "description": "Empty-state body on the wallet transactions tab"
+  },
+  "walletPlatformDues": "Platform dues: ₹{amount}",
+  "@walletPlatformDues": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "walletDuesBody": "This is the commission owed on cash jobs. Keep your wallet topped up to clear it.",
+  "timeMinutesAgo": "{count}m ago",
+  "@timeMinutesAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeHoursAgo": "{count}h ago",
+  "@timeHoursAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeDaysAgo": "{count}d ago",
+  "@timeDaysAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "commonChooseGallery": "Choose from Gallery",
+  "commonTakePhoto": "Take a Photo",
+  "profileStatusNotSelected": "Not Selected",
+  "profileStatusUnderReview": "Under Review",
+  "profileApplied": "Applied",
+  "profileStepDecision": "Decision",
+  "profileYourBid": "Your Bid",
+  "profileTaskBudget": "Task Budget",
+  "profileYouEarn": "You Earn",
+  "profileStartTask": "Start Task",
+  "profileAppliedAgo": "Applied {time}",
+  "@profileAppliedAgo": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "profileMyProfile": "My Profile",
+  "profileReviewsCount": "{count, plural, =1{1 review} other{{count} reviews}}",
+  "@profileReviewsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileTasksDone": "Tasks Done",
+  "profileEarned": "Earned",
+  "profileAvailableForTasks": "Available for Tasks",
+  "profileNotAvailable": "Not Available",
+  "profileVisibleToCustomers": "You're visible to customers",
+  "profileWontReceiveTasks": "You won't receive new tasks",
+  "profileCompletion": "Completion",
+  "profileAvgResponse": "Avg Response",
+  "profileMemberSince": "Member Since",
+  "profileAboutMe": "About Me",
+  "profileEdit": "Edit",
+  "profileMySkills": "My Skills",
+  "profileMyWork": "My Work",
+  "profileAdd": "Add",
+  "profileViewAll": "View all",
+  "profileSecAccount": "ACCOUNT",
+  "profileSecWork": "WORK",
+  "profileSecSupportLegal": "SUPPORT & LEGAL",
+  "profileEditProfile": "Edit Profile",
+  "profileVerificationDocuments": "Verification & Documents",
+  "profileBankPayment": "Bank & Payment",
+  "profileSetWorkingHours": "Set your working hours",
+  "profileWorkPortfolio": "Work Portfolio",
+  "profileShowcaseWork": "Showcase your best work",
+  "profilePhotoCount": "{count, plural, =1{1 photo} other{{count} photos}}",
+  "@profilePhotoCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "profileCompletedTasks": "Completed Tasks",
+  "profileMyReviews": "My Reviews",
+  "profileEarningsPayouts": "Earnings & Payouts",
+  "profileHelpSupport": "Help & Support",
+  "profileTerms": "Terms & Conditions",
+  "profilePrivacy": "Privacy Policy",
+  "profileRateUs": "Rate Us on Play Store",
+  "profileReferEarn": "Refer & Earn ₹200",
+  "profileSignOut": "Sign Out",
+  "profileVersion": "Version {version}",
+  "@profileVersion": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "profileRedirectTitle": "Redirect to External Link",
+  "profileRedirectBody": "You are being redirected to an external website:\n\n{url}\n\nDo you want to continue?",
+  "@profileRedirectBody": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
+  "profileCouldNotOpenLink": "Could not open link",
+  "profileUploadingPhoto": "Uploading photo…",
+  "profilePictureUpdated": "Profile picture updated",
+  "profileUpdatePicture": "Update Profile Picture",
+  "profileEditAboutMe": "Edit About Me",
+  "profileWriteAboutYourself": "Write about yourself...",
+  "profileBioUpdated": "Bio updated",
+  "profileEditSkills": "Edit Skills",
+  "profileSaveSkills": "Save Skills",
+  "profileSkillsUpdated": "Skills updated",
+  "profileNoCoins": "No TaskCoins",
+  "profileNoCoinsBody": "You have 0 TaskCoins in your wallet to redeem.",
+  "profileRedeemCoins": "Redeem TaskCoins",
+  "profileCoinsValue": "{coins} Coins = ₹{coins}",
+  "@profileCoinsValue": {
+    "placeholders": {
+      "coins": {
+        "type": "int"
+      }
+    }
+  },
+  "profileCoinsCredited": "Coins will be credited to your default payout method.",
+  "profileCoinsWillCredit": "₹{amount} will be credited to your account",
+  "@profileCoinsWillCredit": {
+    "placeholders": {
+      "amount": {
+        "type": "int"
+      }
+    }
+  },
+  "profileRedeemAll": "Redeem All",
+  "profileAddPhotosWork": "Add photos of your work",
+  "profilePortfolioHelps": "A strong portfolio helps you win more jobs",
+  "profileNotSet": "Not set",
+  "profileEveryDay": "Every day",
+  "profileHoursVary": "hours vary",
+  "walletWithdrawMoney": "Withdraw Money",
+  "walletAmount": "Amount",
+  "walletAvailableBalance": "Available: ₹{amount}",
+  "@walletAvailableBalance": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "walletEnterValidAmount": "Please enter a valid amount",
+  "walletInsufficientBalance": "Insufficient balance",
+  "walletWithdrawalRequested": "Withdrawal of ₹{amount} requested!",
+  "@walletWithdrawalRequested": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "walletNoEarnings7Days": "No earnings in the last 7 days",
+  "walletEarningsLast7": "Earnings - Last 7 Days",
+  "walletTotalEarned": "Total Earned",
+  "walletJobsCompleted": "Jobs Completed",
+  "walletAvgPerJob": "Average per Job",
+  "verifTitle": "Verification & Documents",
+  "verifProgress": "Verification Progress",
+  "verifDocsVerified": "{verified} of {total} documents verified",
+  "@verifDocsVerified": {
+    "placeholders": {
+      "verified": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "verifDocuments": "DOCUMENTS",
+  "verifAadhaar": "Aadhaar Card",
+  "verifAadhaarUpload": "Upload Aadhaar for identity verification",
+  "verifPan": "PAN Card",
+  "verifPanUpload": "Upload PAN for tax purposes",
+  "verifUnderReview": "Under review",
+  "verifAddressProof": "Address Proof",
+  "verifAddressVerified": "Address verified successfully",
+  "verifAddressUpload": "Upload electricity bill or rent agreement",
+  "verifSelfie": "Selfie Verification",
+  "verifIdentityConfirmed": "Identity confirmed",
+  "verifSelfieUpload": "Capture a selfie to confirm identity",
+  "verifUnlockPremium": "Complete all verifications to unlock premium tasks and higher payouts.",
+  "verifStatusVerified": "Verified",
+  "verifStatusPending": "Pending",
+  "verifStatusRejected": "Rejected",
+  "verifStatusUpload": "Upload",
+  "verifAlreadyVerified": "{title} is already verified!",
+  "@verifAlreadyVerified": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "verifUploadTitle": "Upload {title}",
+  "@verifUploadTitle": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "verifUploading": "Uploading {title}…",
+  "@verifUploading": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "verifSubmitted": "{title} submitted. Our team will review it shortly.",
+  "@verifSubmitted": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "availSaveSchedule": "Save Schedule",
+  "availSaved": "Availability saved",
+  "availEndAfterStart": "End time must be after start time",
+  "availStartTime": "Start time",
+  "availEndTime": "End time",
+  "availYourWeeklyHours": "Your weekly hours",
+  "availNotSetTap": "Not set - tap to add working hours",
+  "availStart": "Start",
+  "availEnd": "End",
+  "availAvailableDay": "Available",
+  "availOff": "Off",
+  "dayMonday": "Monday",
+  "dayTuesday": "Tuesday",
+  "dayWednesday": "Wednesday",
+  "dayThursday": "Thursday",
+  "dayFriday": "Friday",
+  "daySaturday": "Saturday",
+  "daySunday": "Sunday",
+  "timeWeeksAgo": "{count}w ago",
+  "@timeWeeksAgo": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "msgSearchChats": "Search chats…",
+  "msgNoResults": "No results found",
+  "msgNoConversations": "No conversations yet",
+  "msgTryDifferentSearch": "Try a different search term",
+  "msgChatsWillAppear": "When you start a task,\nyour chats will appear here.",
+  "msgTapToOpen": "Tap to open chat",
+  "msgYesterday": "Yesterday",
+  "msgSayHello": "Say hello!",
+  "msgStartConversation": "Start a conversation and\nget things moving.",
+  "msgTakePhoto": "Take Photo",
+  "msgErrorSelectingImage": "Error selecting image: {error}",
+  "@msgErrorSelectingImage": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "msgCouldNotSend": "Could not send message",
+  "msgMessageCopied": "Message copied",
+  "msgTypeMessage": "Type a message…",
+  "notifTitle": "Notifications",
+  "notifUnreadCount": "{count} unread",
+  "@notifUnreadCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "notifAllCaughtUp": "All caught up",
+  "notifMarkAll": "Mark all",
+  "notifNoNotifications": "No notifications yet",
+  "notifEmptyBody": "Job leads, bookings and payouts show up here",
+  "notifSomethingWrong": "Something went wrong",
+  "notifJustNow": "Just now",
+  "editProfileUpdated": "Profile updated successfully",
+  "editProfileFailed": "Failed to update profile: {error}",
+  "@editProfileFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "editFullName": "Full Name",
+  "editFullNameHint": "Enter your full name",
+  "editNameRequired": "Name is required",
+  "editEmail": "Email",
+  "editEmailHint": "Enter your email",
+  "editEmailRequired": "Email is required",
+  "editEmailInvalid": "Enter a valid email",
+  "editPhone": "Phone Number",
+  "editPhoneHint": "Enter your phone number",
+  "editPhoneRequired": "Phone is required",
+  "editCity": "City / Location",
+  "editCityHint": "Enter your city",
+  "editCityRequired": "City is required",
+  "editSaveChanges": "Save Changes",
+  "splashPreparing": "Preparing TaskTeddy",
+  "splashGettingReady": "Getting everything ready...",
+  "splashGettingThingsReady": "Getting things ready...",
+  "splashLocationOff": "Location is off. Continuing...",
+  "splashLocationSkipped": "Location permission skipped. Continuing...",
+  "splashLocationLocked": "Location locked: {label}",
+  "@splashLocationLocked": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "splashLocationFailed": "Could not fetch location. Continuing...",
+  "commonRemove": "Remove",
+  "completedEmptyBody": "No completed tasks yet.\nYour finished work will appear here.",
+  "reviewsRecent": "Recent Reviews",
+  "reviewsNone": "No reviews yet",
+  "portfolioFull": "Portfolio is full ({max} photos max)",
+  "@portfolioFull": {
+    "placeholders": {
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "portfolioAddCaption": "Add a caption",
+  "portfolioCaptionHint": "Optional - e.g. Kitchen deep clean",
+  "portfolioSkip": "Skip",
+  "portfolioPhotoAdded": "Photo added to portfolio",
+  "portfolioAddWorkPhoto": "Add Work Photo",
+  "portfolioRemovePhoto": "Remove Photo",
+  "portfolioRemoveConfirm": "Remove this photo from your portfolio?",
+  "portfolioPhotoRemoved": "Photo removed",
+  "portfolioUploading": "Uploading...",
+  "portfolioAddPhoto": "Add Photo",
+  "portfolioEmpty": "No portfolio photos yet",
+  "portfolioEmptyBody": "Showcase your best work to win more jobs.",
+  "portfolioUntitled": "Untitled",
+  "referTitle": "Refer & Earn",
+  "referEarnHero": "Earn ₹200 for every referral!",
+  "referInviteFriends": "Invite friends to TaskTeddy and earn rewards together.",
+  "referHowItWorks": "How it works",
+  "referStep1": "Share your referral code with friends",
+  "referStep2": "Your friend signs up & completes first task",
+  "referStep3": "Both of you earn ₹200 in TaskCoins!",
+  "referYourCode": "Your Referral Code",
+  "referCodeCopied": "Code copied!",
+  "referShareWhatsApp": "Share via WhatsApp",
+  "referShareDialogOpened": "Share dialog opened!",
+  "referYourReferrals": "Your Referrals",
+  "referTotalReferrals": "Total Referrals",
+  "referEarningsFrom": "Earnings from Referrals",
+  "referStep": "Step {number}",
+  "@referStep": {
+    "placeholders": {
+      "number": {
+        "type": "int"
+      }
+    }
+  },
+  "referShareMessage": "Join TaskTeddy using my referral code {code} and earn ₹200! Download now: https://taskteddy.app",
+  "@referShareMessage": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "bankRemoveConfirmTitle": "Remove {name}?",
+  "@bankRemoveConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "bankRemoveConfirmBody": "This payment method will be removed from your account.",
+  "bankMethodRemoved": "{name} removed",
+  "@bankMethodRemoved": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "bankBankAccount": "Bank Account",
+  "bankBankAccountSub": "Add savings or current account",
+  "bankUpiId": "UPI ID",
+  "bankUpiSub": "Add your UPI address",
+  "bankAddBankAccount": "Add Bank Account",
+  "bankAccountHolderName": "Account Holder Name",
+  "bankAccountNumber": "Account Number",
+  "bankIfscCode": "IFSC Code",
+  "bankFillAllFields": "Please fill all fields",
+  "bankSavingsMask": "Savings Account •••• {last4}",
+  "@bankSavingsMask": {
+    "placeholders": {
+      "last4": {
+        "type": "String"
+      }
+    }
+  },
+  "bankAccountAdded": "Bank account added successfully",
+  "bankAddUpiId": "Add UPI ID",
+  "bankUpiHint": "e.g. name@upi",
+  "bankEnterValidUpi": "Please enter a valid UPI ID",
+  "bankUpiAdded": "UPI ID added successfully",
+  "bankPayoutInfo": "Payout Information",
+  "bankProcessingTime": "Processing Time",
+  "bankProcessingTimeVal": "24 hours after task completion",
+  "bankMinWithdrawal": "Minimum Withdrawal",
+  "bankPlatformFee": "Platform Fee",
+  "bankPlatformFeeVal": "15% per task",
+  "bankPaymentCycle": "Payment Cycle",
+  "bankPaymentCycleVal": "Instant to default method",
+  "bankDefault": "DEFAULT",
+  "bankSetDefault": "Set Default",
+  "helpMyTicketsTooltip": "My tickets",
+  "helpMessageSupport": "Message support",
+  "helpRespond24": "We usually respond within 24 hours.",
+  "helpSubject": "Subject",
+  "helpDescribeIssue": "Describe your issue…",
+  "helpAddSubjectDesc": "Please add a subject and a short description.",
+  "helpTicketSent": "Ticket sent! We will reply in-app.",
+  "helpSend": "Send",
+  "helpNoTickets": "No support tickets yet",
+  "helpResolved": "RESOLVED",
+  "helpOpen": "OPEN",
+  "helpSupportReply": "Support: {reply}",
+  "@helpSupportReply": {
+    "placeholders": {
+      "reply": {
+        "type": "String"
+      }
+    }
+  },
+  "helpReachOut": "Reach out to partner support\n{phone}  •  {email}",
+  "@helpReachOut": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      },
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "helpCallUs": "Call us",
+  "helpEmailUs": "Email us",
+  "helpCouldNotDial": "Could not open dialer on this device.",
+  "helpCouldNotEmail": "Could not open email app on this device.",
+  "helpNeedQuickHelp": "Need quick help?",
+  "helpFindAnswers": "Find answers instantly or contact support anytime.",
+  "helpMyDisputes": "My Payout disputes",
+  "helpNoDisputes": "You don’t have any active disputes.",
+  "helpBrowseTopics": "Browse all help topics",
+  "helpRelatedTo": "Help related to {topic}",
+  "@helpRelatedTo": {
+    "placeholders": {
+      "topic": {
+        "type": "String"
+      }
+    }
+  },
+  "helpCantFind": "Can’t find your answer?",
+  "helpTeamHere": "Our support team is here to help",
+  "helpT1Title": "Tasks & Applications",
+  "helpT1Sub": "Manage applications, bids, slot details, and cover letters",
+  "helpT1Q1": "How do I apply for a task?",
+  "helpT1A1": "Browse available tasks in the Browse tab, select a task that matches your expertise, choose your bid amount, write a brief cover letter describing your experience, and tap Apply.",
+  "helpT1Q2": "Can I cancel or withdraw my application?",
+  "helpT1A2": "Yes. Go to My Applications on the Profile tab, choose the pending application you want to withdraw, and tap the Withdraw option to remove your bid.",
+  "helpT1Q3": "What happens when my application is accepted?",
+  "helpT1A3": "You will receive an instant notification, and the task moves to your \"My Active Tasks\" shelf. You can open the task to view customer details and coordinates.",
+  "helpT1Q4": "What is the task completion OTP?",
+  "helpT1A4": "Upon successfully completing the task, ask the customer for the 4-digit verification OTP. Enter it in the active task window to mark it completed and release your payout.",
+  "helpT1Q5": "What happens if a customer cancels a task after I arrive?",
+  "helpT1A5": "If a customer cancels after you have arrived or started traveling to the location, you may be eligible for a cancellation compensation of ₹50-₹150 depending on the distance traveled. Contact support via the active booking screen.",
+  "helpT1Q6": "How are task ratings calculated?",
+  "helpT1A6": "Your overall rating is the average of ratings given by customers upon task completion. High ratings (4.5+) increase your visibility and give you early access to high-value tasks.",
+  "helpT2Title": "Earnings & Payouts",
+  "helpT2Sub": "Platform fees, bank withdrawals, and ledger payments",
+  "helpT2Q1": "How do I withdraw my earnings?",
+  "helpT2A1": "Go to Earnings & Payouts from your Profile, tap Withdraw, enter the amount (min ₹100), and the funds are instantly transferred to your default payout target.",
+  "helpT2Q2": "What is the platform service fee?",
+  "helpT2A2": "TaskTeddy charges a flat 15% platform service fee on successful task completions to help pay for insurance, marketing, and operations.",
+  "helpT2Q3": "How long does a withdrawal bank payout take?",
+  "helpT2A3": "Payout transfers are initiated instantly. Depending on your bank's IMPS processing speeds, payouts usually reflect in your bank account or UPI within a few minutes.",
+  "helpT2Q4": "Why is my payout stuck in pending status?",
+  "helpT2A4": "If your payout is pending, it's usually due to a banking network delay or verification check. Most pending payouts resolve automatically within 2-4 hours. If it takes longer, reach out with the Payout ID.",
+  "helpT2Q5": "Can I change my default payout bank account?",
+  "helpT2A5": "Yes, you can edit or add bank accounts and UPI IDs anytime via the Bank & Payout screen on your Profile tab. Simply add a new method and tap the star or set as default.",
+  "helpT3Title": "Verification & Profile",
+  "helpT3Sub": "Aadhaar checks, PAN verification, and profile picture settings",
+  "helpT3Q1": "How long does document verification take?",
+  "helpT3A1": "Automated background checks are verified instantly. In cases requiring manual reviews, approval can take up to 24 hours. Your progress bar updates automatically.",
+  "helpT3Q2": "What address proofs are acceptable?",
+  "helpT3A2": "We accept standard utility bills (electricity, pipeline gas, or water bill) not older than 3 months, registered rent agreements, or government certificates in your name.",
+  "helpT3Q3": "Why was my PAN card upload rejected?",
+  "helpT3A3": "Ensure that the photo is clear, all edges are visible, there is no flash reflection, and the name matches your government ID details.",
+  "helpT3Q4": "How do I update my profile details after verification?",
+  "helpT3A4": "Once your identity is verified, major fields like your legal name and government ID cannot be edited directly. To change your registered phone number or correct a name error, contact partner support with supporting documents.",
+  "helpT3Q5": "What should I do if my document verification fails?",
+  "helpT3A5": "If your Aadhaar or PAN is rejected, you will receive a notification stating the reason. Make sure your upload is high-quality, not blurred, and matches your registered profile name before submitting again.",
+  "helpT4Title": "Safety & Code of Conduct",
+  "helpT4Sub": "Emergency support, coordinates tracking, and rules",
+  "helpT4Q1": "I feel unsafe during a task - what do I do?",
+  "helpT4A1": "Safety is our top priority. Leave the location immediately to a public space and call support. In any emergency, dial local police (100/112) first.",
+  "helpT4Q2": "Can I accept payments directly from customers?",
+  "helpT4A2": "No. Asking customers for offline or direct cash/UPI transfers violates partner guidelines and leads to permanent suspension of your TaskTeddy account.",
+  "helpT4Q3": "What should I do if the task scope changes at the location?",
+  "helpT4A3": "If a customer asks you to do additional work not mentioned in the original task description, politely ask them to update the task in the app or pay standard rates. Do not accept offline payment adjustments without informing support.",
+  "helpT4Q4": "How is my location tracked during active tasks?",
+  "helpT4A4": "We track your location in the background only when you are traveling to a task or actively completing a service, to ensure partner safety and provide customers with live ETAs.",
+  "setWeeklyHours": "Weekly hours",
+  "setNotifications": "NOTIFICATIONS",
+  "setPushNotif": "Push Notifications",
+  "setPushNotifSub": "Receive task alerts & updates",
+  "setEmailNotif": "Email Notifications",
+  "setEmailNotifSub": "Weekly summary & promotions",
+  "setSmsNotif": "SMS Notifications",
+  "setSmsNotifSub": "OTP & critical alerts only",
+  "setAppearance": "APPEARANCE",
+  "setDarkMode": "Dark Mode",
+  "setComingSoon": "Coming soon",
+  "setDataStorage": "DATA & STORAGE",
+  "setClearCache": "Clear Cache",
+  "setCacheCleared": "Cache cleared",
+  "setDownloadData": "Download My Data",
+  "setDataExportEmailed": "Data export will be emailed to you",
+  "setDangerZone": "DANGER ZONE",
+  "setDeleteAccount": "Delete Account",
+  "setDeleteAccountTitle": "Delete Account?",
+  "setDeleteAccountBody": "This action is irreversible. All your data, earnings, and reviews will be permanently deleted.",
+  "setDelete": "Delete",
+  "setDeletionSubmitted": "Account deletion request submitted",
+  "reportThisUser": "this user",
+  "reportUserTitle": "Report {name}",
+  "@reportUserTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "reportChooseReason": "Choose a reason. Reports are confidential.",
+  "reportDetailsOptional": "Details (optional)",
+  "reportDetailHint": "Add anything that helps us understand what happened…",
+  "reportSubmit": "Submit Report",
+  "reportSubmitted": "Report submitted. Our team will review it.",
+  "reportReasonInappropriate": "Inappropriate behaviour",
+  "reportReasonNoShow": "No show",
+  "reportReasonSafety": "Safety concern",
+  "reportReasonFraud": "Fraud or scam",
+  "reportReasonPoorQuality": "Poor quality",
+  "reportReasonSpam": "Spam",
+  "reportReasonOther": "Other",
+  "blockConfirmTitle": "Block {name}?",
+  "@blockConfirmTitle": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "blockConfirmBody": "They will no longer be able to message you or match with your tasks. You can unblock them anytime from Settings.",
+  "blockedSuccess": "{name} has been blocked",
+  "@blockedSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "blockedUserFallback": "User",
+  "unblockAction": "Unblock",
+  "unblockedSuccess": "{name} unblocked",
+  "@unblockedSuccess": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "blockedEmptyBody": "People you block will appear here.",
+  "loginSendingOtp": "Sending OTP to {phone}",
+  "@loginSendingOtp": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginOtpSent": "OTP sent to {phone}",
+  "@loginOtpSent": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "loginEnterOtpSent": "Enter OTP sent to your number",
+  "loginErrConnect": "Unable to connect. Please check your internet and try again.",
+  "loginErrServer": "Cannot reach server. Please try again later.",
+  "loginErrInvalidOtp": "Invalid OTP. Please check and try again.",
+  "loginErrExpiredOtp": "OTP expired. Please request a new one.",
+  "loginErrTooMany": "Too many attempts. Please wait a moment and try again.",
+  "loginErrGeneric": "Something went wrong. Please try again.",
+  "loginTermsPrefix": "By clicking continue, you accept our ",
+  "loginAnd": " and ",
+  "loginTermsSuffix": ".",
+  "dashLoading": "Loading your dashboard…",
+  "dashLocationPicker": "Location picker opened...",
+  "dashAssigned": "{count} assigned",
+  "@dashAssigned": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashAvailable": "{count} available",
+  "@dashAvailable": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashOngoing": "{count} ongoing",
+  "@dashOngoing": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashUseAppliedTab": "Use the Applied tab in bottom navigation",
+  "dashCheckBackSoon": "Check back soon — new tasks are posted daily!",
+  "dashBrowseStartEarning": "Browse available tasks and start earning!",
+  "dashSpecialOffer": "Special Offer!",
+  "dashBonusRewards": "Complete tasks to earn bonus rewards",
+  "dashCompleteBooking": "Complete Booking",
+  "dashBookingOtpPrompt": "Ask the customer for their completion OTP for \"{service}\" and enter it below.",
+  "@dashBookingOtpPrompt": {
+    "placeholders": {
+      "service": {
+        "type": "String"
+      }
+    }
+  },
+  "dashComplete": "Complete",
+  "dashBookingComplete": "Booking marked complete!",
+  "dashThisBooking": "this booking",
+  "dashMarkComplete": "Mark Complete",
+  "dashScheduled": "Scheduled",
+  "dashServiceFallback": "Service",
+  "dashCustomerFallback": "Customer",
+  "dashOverdue": "Overdue",
+  "dashMinLeft": "{count}m left",
+  "@dashMinLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashHrLeft": "{count}h left",
+  "@dashHrLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashDayLeft": "{count}d left",
+  "@dashDayLeft": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashApplied": "{count} applied",
+  "@dashApplied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "dashStatusPending": "Pending",
+  "dashStatusConfirmed": "Confirmed",
+  "dashStatusCompleted": "Completed",
+  "dashStatusCancelled": "Cancelled",
+  "dashTip1": "Complete 3 more tasks this week to reach Gold status",
+  "dashTip2": "Tasks with a quick response get 2x more bookings",
+  "dashTip3": "Keep your profile 100% complete for priority listing",
+  "dashTip4": "Maintain a 4.8+ rating to unlock premium task access",
+  "dashTip5": "Enable location for better task matching in your area",
+  "browseNotNow": "Not now",
+  "browseTaskCompleted": "Task completed",
+  "browseCollectedCash": "You collected ₹{amount} in cash from the customer.",
+  "@browseCollectedCash": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "browseCashCollected": "Cash collected",
+  "browsePlatformFeeMethod": "Platform fee ({method})",
+  "@browsePlatformFeeMethod": {
+    "placeholders": {
+      "method": {
+        "type": "String"
+      }
+    }
+  },
+  "browseNetEarning": "Net earning",
+  "browseFeeDeducted": "The ₹{amount} platform fee was deducted from your wallet. Keep your wallet topped up to avoid dues.",
+  "@browseFeeDeducted": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "browseDone": "Done",
+  "browseLeadDismissed": "Lead dismissed",
+  "browseUndo": "Undo",
+  "browseGpsPinging": "Pinging GPS Satellites...",
+  "browseGpsResolving": "Resolving coordinates...",
+  "browseGpsFetching": "Fetching nearest tasks...",
+  "browseLocationDetected": "Location auto-detected to {city}! Nearest tasks loaded.",
+  "@browseLocationDetected": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "browseSelectLocation": "Select Location",
+  "browseSelectLocationSub": "Browse nearby open tasks in your preferred city",
+  "browseAutoDetect": "Auto-Detect My Location",
+  "browseAccessingGps": "Accessing high-accuracy GPS coordinates",
+  "browseSimulateGps": "Simulate high-accuracy GPS check",
+  "browsePopularCities": "POPULAR CITIES",
+  "browseBrowsingNearest": "Browsing tasks nearest to {city}.",
+  "@browseBrowsingNearest": {
+    "placeholders": {
+      "city": {
+        "type": "String"
+      }
+    }
+  },
+  "browseReset": "Reset",
+  "browsePresetAll": "All",
+  "browsePresetUnder500": "Under ₹500",
+  "browsePreset500to2000": "₹500-₹2000",
+  "browsePresetAbove2000": "Above ₹2000",
+  "browseMinBudget": "Min Budget (₹)",
+  "browseMaxBudget": "Max Budget (₹)",
+  "browseHintAny": "Any",
+  "browseFailedLoad": "Failed to load tasks",
+  "browseRefresh": "Refresh",
+  "browseCatAll": "All",
+  "browseOpenTasks": "{count} open tasks",
+  "@browseOpenTasks": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browseSortLabel": "Sort: {label}",
+  "@browseSortLabel": {
+    "placeholders": {
+      "label": {
+        "type": "String"
+      }
+    }
+  },
+  "browseSortLatest": "latest",
+  "@browseSortLatest": {
+    "description": "Sort option: newest posted tasks first"
+  },
+  "browseSortBudget": "budget",
+  "browseSortDeadline": "deadline",
+  "browseSortLeastBids": "least bids",
+  "browsePosted": "Posted {ago}",
+  "@browsePosted": {
+    "description": "Timestamp on a task card, e.g. 'Posted 3h ago'",
+    "placeholders": { "ago": { "type": "String" } }
+  },
+  "browseJustNow": "just now",
+  "@browseJustNow": {
+    "description": "Relative time for a task posted less than a minute ago"
+  },
+  "browsePostedBy": "Posted by {name}",
+  "@browsePostedBy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "browseBudgetSmall": "budget",
+  "browseUrgent": "Urgent",
+  "browseDueToday": "· Due today!",
+  "browseDueTomorrow": "· Due tomorrow",
+  "browseDueInDays": "· Due in {days} days",
+  "@browseDueInDays": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "browseDue": "Due {date}",
+  "@browseDue": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "browseBids": "{count} bids",
+  "@browseBids": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "browseDismiss": "Dismiss",
+  "browseBidLower": "Your bid is ₹{amount} lower — better chance!",
+  "@browseBidLower": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "browseBidAbove": "Above budget — explain the value in your cover letter",
+  "browseBidMatches": "Your bid matches the budget",
+  "browseCompBelow": "You're {pct}% below average bids",
+  "@browseCompBelow": {
+    "placeholders": {
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
+  "browseCompAbove": "You're {pct}% above average bids",
+  "@browseCompAbove": {
+    "placeholders": {
+      "pct": {
+        "type": "String"
+      }
+    }
+  },
+  "browseCompMatches": "Your bid matches the average",
+  "browseYourBidAmount": "Your Bid Amount (₹)",
+  "browseCompetitiveAnalysis": "Competitive Analysis",
+  "browseAvgBid": "Avg Bid",
+  "browseEstTakeHome": "Estimated Take-Home",
+  "browseAfterFee": "after 10% platform fee",
+  "browseCoverLetter": "Cover Letter *",
+  "browseCoverHint": "Introduce yourself. Why are you the best fit? Mention your experience and availability...",
+  "browseCoverTip": "Good cover letters increase selection chance by 70%",
+  "browseFeeNote": "TaskTeddy charges 10% platform fee only when a task is completed.",
+  "browseSubmitApplication": "Submit Application",
+  "browseTaskRefMissing": "Task reference missing",
+  "browseCustomerNotifiedSharing": "Customer notified. Sharing your location.",
+  "browseBackedOut": "You backed out. The job is open again.",
+  "browseInvalidOtp": "Invalid OTP",
+  "browseActiveTask": "Active Task",
+  "browseYouEarnAmt": "You earn: ₹{amount}",
+  "@browseYouEarnAmt": {
+    "placeholders": {
+      "amount": {
+        "type": "String"
+      }
+    }
+  },
+  "browseFailedOpenChat": "Failed to open chat",
+  "browseChat": "Chat",
+  "browseRatingLabel": "{rating} rating",
+  "@browseRatingLabel": {
+    "placeholders": {
+      "rating": {
+        "type": "String"
+      }
+    }
+  },
+  "browseHeadingToCustomer": "Heading to the customer",
+  "browseOtwActiveBody": "Customer notified. Your live location is being shared while this screen is open.",
+  "browseOtwIdleBody": "Let the customer know you are on your way. We will share your live location so they can track your arrival.",
+  "browseCustomerNotified": "Customer notified",
+  "browseNotifying": "Notifying...",
+  "browseCancelling": "Cancelling...",
+  "browseCancelJob": "Cancel job",
+  "browseEnterCompletionOtp": "Enter Completion OTP",
+  "browseOtpPrompt": "Ask the customer for the 4-digit OTP to confirm task completion and receive payment.",
+  "browseVerifyComplete": "Verify & Complete Task",
+  "browseReasonEmergency": "Emergency",
+  "browseReasonTooFar": "Too far",
+  "browseReasonSchedule": "Schedule conflict",
+  "browseReasonOther": "Other",
+  "browseBackOutTitle": "Back out of this job?",
+  "browseBackOutWarning": "This reopens the task for other taskers. Repeated cancellations hurt your reliability score.",
+  "browseReason": "Reason",
+  "browseAddNote": "Add a note (optional)",
+  "browseKeepJob": "Keep job",
+  "browseThanksRating": "Thanks for rating the customer.",
+  "browseRateCustomer": "Rate {name}",
+  "@browseRateCustomer": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "browseRateExperience": "How was your experience working with this customer?",
+  "browseAddComment": "Add a comment (optional)",
+  "browseSubmitRating": "Submit rating",
+  "browseAppSubmitted": "Application Submitted!",
+  "browseAppSubmittedBody": "\"{title}\"\nThe customer will review and accept the best bid.",
+  "@browseAppSubmittedBody": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "browseAppSubmittedNote": "You'll get a notification when accepted. Keep applying to more tasks!",
+  "browseViewMyApps": "View My Applications",
+  "browseBrowseMore": "Browse More Tasks",
+  "browsePhotos": "Photos",
+  "reputationYourLevel": "Your Level",
+  "reputationReliability": "Reliability",
+  "reputationJobsDone": "{count, plural, =1{1 job done} other{{count} jobs done}}",
+  "@reputationJobsDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "reputationJobsToNext": "{completed}/{next} jobs to {tier}",
+  "@reputationJobsToNext": {
+    "placeholders": {
+      "completed": {
+        "type": "int"
+      },
+      "next": {
+        "type": "int"
+      },
+      "tier": {
+        "type": "String"
+      }
+    }
+  },
+  "reputationTopLevel": "Top level",
+  "reputationExplainer": "Complete jobs and keep a high rating to level up.",
+  "reputationLevelNew": "New",
+  "reputationLevelBronze": "Bronze",
+  "reputationLevelSilver": "Silver",
+  "reputationLevelGold": "Gold",
+  "reputationLevelPro": "Pro"
+}

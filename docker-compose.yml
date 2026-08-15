@@ -1,0 +1,101 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: taskteddy_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: taskteddy
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d taskteddy"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: taskteddy_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: taskteddy_backend
+    restart: unless-stopped
+    env_file:
+      # Secrets (JWT_SECRET, ADMIN_*, SENDGRID_API_KEY) come from here — not baked
+      # into this file. Only the compose-internal overrides live below.
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: development
+      HOST: 0.0.0.0
+      PORT: 8000
+      # Override .env's localhost URLs with the compose service hostnames.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/taskteddy
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: "*"
+      RATE_LIMIT_ENABLED: "true"
+      # Dev-only: migrations are applied by the entrypoint; set false to skip.
+      RUN_MIGRATIONS: "true"
+    ports:
+      # Host 8080 -> container 8000. Host 8000 is used by an unrelated project
+      # (eldmain/Backend-ELD), so TaskTeddy is published on 8080 to avoid the clash.
+      - "8080:8000"
+    volumes:
+      # Persist uploaded files (KYC documents, avatars, chat images) across
+      # container rebuilds — without this every rebuild wipes user uploads.
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Admin Panel
+  admin:
+    build:
+      context: ./taskteddy_admin
+      dockerfile: Dockerfile
+      args:
+        # Inlined into the client bundle at build time. Must be reachable from the
+        # end user's BROWSER — for local compose that's the host-mapped backend
+        # port (localhost:8000), NOT the internal `backend` hostname. Override for
+        # production, e.g. NEXT_PUBLIC_API_URL=https://api.taskteddy.com
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    container_name: taskteddy_admin
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3001:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

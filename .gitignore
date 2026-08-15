@@ -1,0 +1,40 @@
+.blackboxcli/
+
+# Secrets — never commit
+.env
+*.env
+!.env.example
+backend/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Local databases / artifacts
+*.db
+backend/sqlite.db
+backend/taskteddy.db
+backend/sg_result*
+backend/uploads/
+
+# OS / IDE
+.DS_Store
+.idea/
+
+# Flutter / Dart
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+
+# Node / Next.js (admin)
+node_modules/
+taskteddy_admin/.next/
+taskteddy_admin/out/
+
+# Throwaway SendGrid test scripts (contained a leaked key)
+backend/test_email.py
+backend/test_sg.py

@@ -1,0 +1,218 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../l10n/app_localizations.dart';
+import '../theme/theme.dart';
+import 'home.dart';
+import 'tasks.dart';
+import 'profile.dart';
+
+class MainShell extends StatefulWidget {
+  const MainShell({super.key, this.initialIndex = 0});
+  final int initialIndex;
+  @override
+  State<MainShell> createState() => _ShellState();
+}
+
+class _ShellState extends State<MainShell> {
+  late int _i;
+  static const _tabCount = 5;
+
+  List<Widget> get _screens => [
+        const HomeScreen(),
+        // "Tasks" tab shows only open tasks (still awaiting a tasker).
+        const MyTasksScreen(sections: [TaskSection.open]),
+        // After a successful post, jump to the Tasks tab (rebuilt fresh so the
+        // new task appears) instead of a dead-end pop.
+        PostTaskScreen(onPosted: () => setState(() => _i = 1)),
+        // "Active" tab shows in-progress jobs plus finished ones
+        // (replaces the old service Bookings tab).
+        const MyTasksScreen(sections: [TaskSection.active, TaskSection.done]),
+        const ProfileScreen(),
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    _i = widget.initialIndex.clamp(0, _tabCount - 1);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: C.bg,
+        body: _screens[_i],
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(
+                  color: C.border.withValues(alpha: 0.5), width: 0.5),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
+              child: SizedBox(
+                height: 78,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(child: _navButton(0)),
+                        Expanded(child: _navButton(1)),
+                        const SizedBox(width: 72),
+                        Expanded(child: _navButton(3)),
+                        Expanded(child: _navButton(4)),
+                      ],
+                    ),
+                    Transform.translate(
+                      offset: const Offset(0, -1),
+                      child: _navButton(2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _navButton(int i) => _NavBtn(
+        icon: _navIcons[i],
+        activeIcon: _navIconsActive[i],
+        label: _navLabels(context)[i],
+        active: _i == i,
+        center: i == 2,
+        onTap: () => setState(() => _i = i),
+      );
+
+  static const _navIcons = [
+    Icons.home_outlined,
+    Icons.assignment_outlined,
+    Icons.add_box_outlined,
+    Icons.bolt_outlined,
+    Icons.person_outline,
+  ];
+
+  static const _navIconsActive = [
+    Icons.home,
+    Icons.assignment,
+    Icons.add_box,
+    Icons.bolt,
+    Icons.person,
+  ];
+
+  List<String> _navLabels(BuildContext context) {
+    final t = AppL10n.of(context)!;
+    return [
+      t.navHome,
+      t.navTasks,
+      t.navPost,
+      t.navActive,
+      t.navProfile,
+    ];
+  }
+}
+
+class _NavBtn extends StatelessWidget {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final bool active;
+  final bool center;
+  final VoidCallback onTap;
+
+  const _NavBtn({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.active,
+    required this.center,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: center
+            ? SizedBox(
+                width: 68,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: active ? C.primaryDark : C.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: C.primary.withValues(alpha: .35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        active ? activeIcon : icon,
+                        size: 22,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: C.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Container(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? C.primary.withValues(alpha: 0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        active ? activeIcon : icon,
+                        size: 23,
+                        color: active ? C.primary : C.text3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      label,
+                      style: GoogleFonts.poppins(
+                        fontSize: 10.5,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        color: active ? C.primary : C.text3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      );
+}
