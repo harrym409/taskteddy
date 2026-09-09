@@ -87,7 +87,7 @@ def get_security_headers() -> dict:
         f"base-uri 'self'"
     )
     
-    return {
+    headers = {
         "X-Content-Type-Options": "nosniff",
         "X-Frame-Options": "DENY",
         "X-XSS-Protection": "1; mode=block",
@@ -95,3 +95,14 @@ def get_security_headers() -> dict:
         "Permissions-Policy": "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=()",
         "Content-Security-Policy": csp,
     }
+    # Force HTTPS for a year (with subdomains) once we're serving over TLS in
+    # production. Never send HSTS in dev — it would pin http://localhost to https.
+    try:
+        from config import get_settings
+        if get_settings()["IS_PRODUCTION"]:
+            headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains; preload"
+            )
+    except Exception:
+        pass
+    return headers
