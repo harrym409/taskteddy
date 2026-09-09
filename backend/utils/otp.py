@@ -272,10 +272,16 @@ def verify_otp(phone: str, otp: str) -> dict:
                 created_at=now,
                 updated_at=now,
             )
+
+            # NOTE: the ₹500 welcome bonus is NOT granted here. New customers
+            # earn it only after completing their profile (name + email) and
+            # verifying their email — see grant_signup_bonus_if_eligible(),
+            # called from the email-verification endpoints.
+
             session.add(new_user)
             session.commit()
             session.refresh(new_user)
-            
+
             return {
                 "valid": True,
                 "is_new_user": True,

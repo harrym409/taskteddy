@@ -18,7 +18,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _pushNotif = true;
   bool _emailNotif = false;
   bool _smsNotif = true;
-  bool _darkMode = false;
   final _localeController = LocaleController();
 
   // Short native label shown as the trailing value for the Language row.
@@ -105,14 +104,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SectionTitle(l.setAppearance),
           const SizedBox(height: 8),
           _SettingsCard(children: [
-            _ToggleItem(
-              icon: Icons.dark_mode_outlined,
-              title: l.setDarkMode,
-              subtitle: l.setComingSoon,
-              value: _darkMode,
-              onChanged: (v) => setState(() => _darkMode = v),
-            ),
-            const Divider(height: 1, indent: 46),
             _TapItem(
               icon: Icons.language,
               title: l.language,

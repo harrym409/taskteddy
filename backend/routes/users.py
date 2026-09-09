@@ -184,6 +184,11 @@ def verify_email(
     user.pending_email_token = None
     user.pending_email_expires_at = None
     user.updated_at = now
+
+    # Unlock the one-time ₹500 welcome bonus now that the email is verified.
+    from routes._helpers import grant_signup_bonus_if_eligible
+    grant_signup_bonus_if_eligible(session, user)
+
     session.commit()
     session.refresh(user)
 
@@ -370,6 +375,11 @@ def verify_email_otp_endpoint(
     user.email = email
     user.email_verified_at = now
     user.updated_at = now
+
+    # Unlock the one-time ₹500 welcome bonus now that the email is verified.
+    from routes._helpers import grant_signup_bonus_if_eligible
+    granted = grant_signup_bonus_if_eligible(session, user)
+
     session.commit()
     session.refresh(user)
 
@@ -377,6 +387,7 @@ def verify_email_otp_endpoint(
         "success": True,
         "message": "Email verified successfully",
         "user": user_to_public(user),
+        "bonus_granted": granted,
     }
 
 

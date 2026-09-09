@@ -18,6 +18,7 @@ class _WalletState extends State<WalletScreen> with SingleTickerProviderStateMix
   late TabController _tabCtrl;
   late AppL10n _l;
   final TaskerState _state = TaskerState();
+  bool _settlingDues = false;
 
   @override
   void initState() {
@@ -259,12 +260,52 @@ class _WalletState extends State<WalletScreen> with SingleTickerProviderStateMix
                       color: T.red,
                       height: 1.4),
                 ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  height: 36,
+                  child: ElevatedButton(
+                    onPressed: _settlingDues ? null : _settleDues,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: T.red,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 18),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: _settlingDues
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : Text(_l.browseSettleNow,
+                            style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w800)),
+                  ),
+                ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _settleDues() async {
+    setState(() => _settlingDues = true);
+    final err = await ApiService.settleDues();
+    if (!mounted) return;
+    setState(() => _settlingDues = false);
+    final messenger = ScaffoldMessenger.of(context);
+    if (err == null) {
+      _state.loadWallet();
+      messenger.showSnackBar(SnackBar(
+          content: Text(_l.walletDuesSettled), backgroundColor: T.green));
+    } else {
+      messenger.showSnackBar(
+          SnackBar(content: Text(err), backgroundColor: T.red));
+    }
   }
 
   void _showWithdrawSheet() {

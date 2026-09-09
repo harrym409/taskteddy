@@ -380,6 +380,36 @@ class ApiService {
     }
   }
 
+  /// Whether the tasker is paused from browsing over unsettled cash dues.
+  /// Returns {blocked, dues, pending_cash_jobs, limit}. Never throws.
+  static Future<Map<String, dynamic>> getDuesStatus() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_base/api/tasker/dues-status'),
+        headers: await _headers(),
+      ).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200) return _decodeMap(res.body);
+    } catch (_) {
+      // Best-effort: on error, don't block the tasker.
+    }
+    return {'blocked': false, 'dues': 0, 'pending_cash_jobs': 0, 'limit': 2};
+  }
+
+  /// Settle the tasker's outstanding cash dues (clears the balance + counter,
+  /// unpausing browsing). Returns null on success, or an error message.
+  static Future<String?> settleDues() async {
+    try {
+      final res = await http.post(
+        Uri.parse('$_base/api/tasker/settle-dues'),
+        headers: await _headers(),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) return null;
+      return _errorMessage(res, 'Could not settle dues');
+    } catch (e) {
+      return e.toString().replaceAll('Exception: ', '');
+    }
+  }
+
   /// Fetch a single task by ID
   static Future<TaskModel?> getTaskById(String taskId) async {
     try {
@@ -796,6 +826,7 @@ class ApiService {
   static Future<bool> sendMessage({
     required String conversationId,
     required String text,
+    Map<String, dynamic>? location,
   }) async {
     try {
       final res = await _client.post(
@@ -804,6 +835,7 @@ class ApiService {
         body: jsonEncode({
           'text': text,
           'image_url': null,
+          if (location != null) 'location': location,
         }),
       );
       return res.statusCode == 201 || res.statusCode == 200;

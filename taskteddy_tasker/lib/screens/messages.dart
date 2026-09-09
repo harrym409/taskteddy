@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import '../theme/theme.dart';
 import '../theme/app_theme.dart';
@@ -529,7 +530,6 @@ class ChatScreen extends StatefulWidget {
 }
 
 class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  late final TextEditingController _composer;
   late final ScrollController _scroll;
   String _currentUserId = '';
   List<_ChatMessage> _messages = [];
@@ -539,85 +539,10 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 
   // Track failed temp IDs
   final Set<String> _failedIds = {};
-  final _imagePicker = ImagePicker();
-
-  Future<void> _pickImage(ImageSource source) async {
-    Navigator.of(context).pop(); // Close bottom sheet
-    try {
-      final pickedFile = await _imagePicker.pickImage(source: source);
-      if (pickedFile == null) return;
-      
-      final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-      final tempMsg = _ChatMessage(
-        id: tempId,
-        text: '',
-        isMine: true,
-        sentAt: DateTime.now(),
-        imageUrl: pickedFile.path,
-      );
-      
-      setState(() {
-        _messages.insert(0, tempMsg);
-      });
-      _scrollToBottom();
-      
-      final result = await ApiService.sendImageMessage(
-        conversationId: widget.conversation.id,
-        file: pickedFile,
-      );
-      
-      if (!mounted) return;
-      if (result == null) {
-        setState(() => _failedIds.add(tempId));
-      } else {
-        await _loadMessages(hideLoading: true);
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppL10n.of(context)!.msgErrorSelectingImage(e.toString().replaceAll('Exception: ', '')), style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
-          backgroundColor: T.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  void _showAttachmentOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.camera_alt_rounded, color: T.primary),
-                title: Text(AppL10n.of(context)!.msgTakePhoto, style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: T.text1)),
-                onTap: () => _pickImage(ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: T.primary),
-                title: Text(AppL10n.of(context)!.commonChooseGallery, style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: T.text1)),
-                onTap: () => _pickImage(ImageSource.gallery),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   @override
   void initState() {
     super.initState();
-    _composer = TextEditingController();
     _scroll = ScrollController()..addListener(_onScroll);
     _bootstrap();
     _pollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -628,7 +553,6 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _pollingTimer?.cancel();
-    _composer.dispose();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     super.dispose();
@@ -668,10 +592,9 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     if (shouldScroll) _scrollToBottom();
   }
 
-  Future<void> _sendMessage() async {
-    final text = _composer.text.trim();
+  Future<void> _send(String rawText) async {
+    final text = rawText.trim();
     if (text.isEmpty) return;
-    _composer.clear();
     HapticFeedback.lightImpact();
 
     // Optimistic UI update
@@ -695,6 +618,46 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       setState(() {
         _failedIds.add(tempMsg.id);
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppL10n.of(context)!.msgCouldNotSend,
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+          ),
+          backgroundColor: T.red,
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+    await _loadMessages(hideLoading: true);
+  }
+
+  Future<void> _sendLocation(_SharedLocation loc) async {
+    HapticFeedback.lightImpact();
+    final payload = loc.toJson();
+    final tempMsg = _ChatMessage(
+      id: 'temp_${DateTime.now().millisecondsSinceEpoch}',
+      text: '',
+      isMine: true,
+      sentAt: DateTime.now(),
+      location: payload,
+    );
+    setState(() {
+      _messages.insert(0, tempMsg);
+    });
+    _scrollToBottom();
+
+    final success = await ApiService.sendMessage(
+      conversationId: widget.conversation.id,
+      text: '',
+      location: payload,
+    );
+    if (!success) {
+      if (!mounted) return;
+      setState(() => _failedIds.add(tempMsg.id));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -807,7 +770,10 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
                   if (widget.conversation.closed)
                     const _ChatClosedBar()
                   else
-                    _buildComposer(),
+                    _PresetComposer(
+                      onSend: _send,
+                      onSendLocation: _sendLocation,
+                    ),
                 ],
               ),
 
@@ -1072,59 +1038,840 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   // ── Composer bar ──
-  Widget _buildComposer() {
+}
+
+// ─── Preset-only composer ───────────────────────────────────────────────────
+// Free-text and photo sending are intentionally removed. Taskers and customers
+// coordinate using curated, ready-made messages only, so no one can pass a
+// phone number or take the deal off-platform. Tapping a message sends it.
+
+class _PresetCategory {
+  final String title;
+  final List<String> messages;
+  const _PresetCategory(this.title, this.messages);
+}
+
+/// Tasker → customer curated messages, grouped by stage of the job.
+const List<_PresetCategory> _presetCategories = [
+  _PresetCategory('Greeting', [
+    'Hi! Thanks for considering my offer.',
+    'Hello, I\'m available for this task.',
+    'Happy to help with this.',
+  ]),
+  _PresetCategory('Scheduling', [
+    'I can start at the scheduled time.',
+    'Are we still on for the scheduled time?',
+    'I\'m on my way now.',
+    'I\'ll reach shortly.',
+    'Could we start a little later?',
+  ]),
+  _PresetCategory('Task details', [
+    'Could you share a bit more detail about the task?',
+    'I\'ll bring the required tools.',
+    'Do you have the materials, or should I arrange them?',
+    'The quoted price covers the full job.',
+    'Understood, I\'ll take care of it.',
+  ]),
+  _PresetCategory('Arrival & location', [
+    'Please share the exact location / landmark.',
+    'I\'ve arrived at the location.',
+    'I\'m at the gate — please guide me in.',
+    'Kindly confirm the address in the task.',
+  ]),
+  _PresetCategory('Confirming', [
+    'Sounds good, I\'ll proceed.',
+    'Confirmed, see you then.',
+    'Thank you for accepting my offer.',
+    'Noted, thank you.',
+  ]),
+  _PresetCategory('During the task', [
+    'I\'ve started the work.',
+    'Work is going well.',
+    'Here\'s an update on the progress.',
+    'I\'m almost done.',
+  ]),
+  _PresetCategory('Wrapping up', [
+    'The task is complete.',
+    'Please review the work when you can.',
+    'Thank you — it was a pleasure working with you!',
+    'Kindly mark the task as completed.',
+  ]),
+  _PresetCategory('Need to discuss', [
+    'I\'ve run into a small issue — can we discuss?',
+    'This may take a little more time than expected.',
+    'Could you clarify this part for me?',
+    'Let\'s sort this out together.',
+  ]),
+];
+
+/// The most-used messages, surfaced as one-tap chips above the picker.
+const List<String> _quickPresets = [
+  'Hi! Thanks for considering my offer.',
+  'I\'m on my way now.',
+  'I\'ve arrived at the location.',
+  'I\'ve started the work.',
+  'The task is complete.',
+  'Thank you!',
+];
+
+// ─── Fill-in-the-blank presets ──────────────────────────────────────────────
+// A preset with ONE typed slot the user fills via a picker (number wheel, time
+// or date+time). The slot is never a free-text field, so a phone number or
+// email can't be entered — only a bounded value — yet the message stays specific.
+
+enum _SlotType { minutes, hours, amount, time, dateTime }
+
+class _SlotPreset {
+  final String title; // menu label
+  final String template; // contains a single "{}" placeholder
+  final _SlotType type;
+  final int min;
+  final int max;
+  final int step;
+  final int init; // default value the wheel opens on
+  const _SlotPreset(
+    this.title,
+    this.template,
+    this.type, {
+    this.min = 0,
+    this.max = 0,
+    this.step = 1,
+    this.init = 0,
+  });
+}
+
+/// Tasker → customer fill-in messages.
+const List<_SlotPreset> _slotPresets = [
+  _SlotPreset('Share your ETA', 'I\'ll reach in about {}.', _SlotType.minutes,
+      min: 5, max: 120, step: 5, init: 15),
+  _SlotPreset('I can start at', 'I can start at {}.', _SlotType.time),
+  _SlotPreset('I can arrive by', 'I can arrive by {}.', _SlotType.time),
+  _SlotPreset('I\'ll be done by', 'I\'ll be done by {}.', _SlotType.time),
+  _SlotPreset(
+      'Propose a new date & time', 'Can we reschedule to {}?', _SlotType.dateTime),
+  _SlotPreset('Let them know a delay', 'I\'m running about {} late.',
+      _SlotType.minutes,
+      min: 5, max: 90, step: 5, init: 10),
+  _SlotPreset('Quote a price', 'The price for this will be ₹{}.',
+      _SlotType.amount,
+      min: 50, max: 100000, step: 50, init: 500),
+  _SlotPreset('Add an extra charge', 'This will cost ₹{} extra.',
+      _SlotType.amount,
+      min: 50, max: 50000, step: 50, init: 200),
+  _SlotPreset('Estimate materials cost', 'Materials will cost around ₹{}.',
+      _SlotType.amount,
+      min: 50, max: 50000, step: 50, init: 300),
+  _SlotPreset(
+      'Estimate the time needed', 'This will take about {}.', _SlotType.hours,
+      min: 1, max: 12, step: 1, init: 2),
+];
+
+String _money(int v) {
+  final s = v.toString();
+  final b = StringBuffer();
+  for (int i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(',');
+    b.write(s[i]);
+  }
+  return b.toString();
+}
+
+String _fmtTime(TimeOfDay t) {
+  final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+  final m = t.minute.toString().padLeft(2, '0');
+  final ap = t.period == DayPeriod.am ? 'AM' : 'PM';
+  return '$h:$m $ap';
+}
+
+String _fmtDateTime(DateTime d, TimeOfDay t) {
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return '${days[d.weekday - 1]}, ${d.day} ${months[d.month - 1]}, ${_fmtTime(t)}';
+}
+
+/// Value as it reads inside the sent message (with its unit word).
+String _slotValueForMessage(_SlotType type, int v) {
+  switch (type) {
+    case _SlotType.minutes:
+      return '$v minutes';
+    case _SlotType.hours:
+      return v == 1 ? '1 hour' : '$v hours';
+    case _SlotType.amount:
+      return _money(v);
+    default:
+      return '$v';
+  }
+}
+
+/// Short value label shown on the spinning wheel.
+String _wheelLabel(_SlotType type, int v) {
+  switch (type) {
+    case _SlotType.minutes:
+      return '$v min';
+    case _SlotType.hours:
+      return v == 1 ? '1 hour' : '$v hours';
+    case _SlotType.amount:
+      return '₹${_money(v)}';
+    default:
+      return '$v';
+  }
+}
+
+/// Opens the right picker for a slot preset and returns the finished message
+/// (or null if the user cancels).
+Future<String?> _resolveSlot(BuildContext context, _SlotPreset p) async {
+  switch (p.type) {
+    case _SlotType.time:
+      final t =
+          await showTimePicker(context: context, initialTime: TimeOfDay.now());
+      if (t == null) return null;
+      return p.template.replaceFirst('{}', _fmtTime(t));
+    case _SlotType.dateTime:
+      final now = DateTime.now();
+      final d = await showDatePicker(
+        context: context,
+        initialDate: now,
+        firstDate: now,
+        lastDate: now.add(const Duration(days: 60)),
+      );
+      if (d == null) return null;
+      if (!context.mounted) return null;
+      final t =
+          await showTimePicker(context: context, initialTime: TimeOfDay.now());
+      if (t == null) return null;
+      return p.template.replaceFirst('{}', _fmtDateTime(d, t));
+    default:
+      final v = await showModalBottomSheet<int>(
+        context: context,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        ),
+        builder: (ctx) => _NumberWheelSheet(preset: p),
+      );
+      if (v == null) return null;
+      return p.template.replaceFirst('{}', _slotValueForMessage(p.type, v));
+  }
+}
+
+class _NumberWheelSheet extends StatefulWidget {
+  final _SlotPreset preset;
+  const _NumberWheelSheet({required this.preset});
+
+  @override
+  State<_NumberWheelSheet> createState() => _NumberWheelSheetState();
+}
+
+class _NumberWheelSheetState extends State<_NumberWheelSheet> {
+  late final List<int> _values;
+  late int _selected;
+  late final FixedExtentScrollController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    final p = widget.preset;
+    _values = [for (int v = p.min; v <= p.max; v += p.step) v];
+    var idx = _values.indexOf(p.init);
+    if (idx < 0) idx = 0;
+    _selected = _values[idx];
+    _ctrl = FixedExtentScrollController(initialItem: idx);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SizedBox(
+        height: 344,
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: T.border, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 16),
+            Text(widget.preset.title,
+                style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: T.text1)),
+            const SizedBox(height: 6),
+            Expanded(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    height: 46,
+                    margin: const EdgeInsets.symmetric(horizontal: 44),
+                    decoration: BoxDecoration(
+                      color: T.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  ListWheelScrollView.useDelegate(
+                    controller: _ctrl,
+                    itemExtent: 46,
+                    perspective: 0.004,
+                    diameterRatio: 1.5,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (i) {
+                      setState(() => _selected = _values[i]);
+                      HapticFeedback.selectionClick();
+                    },
+                    childDelegate: ListWheelChildBuilderDelegate(
+                      childCount: _values.length,
+                      builder: (_, i) => Center(
+                        child: Text(
+                          _wheelLabel(widget.preset.type, _values[i]),
+                          style: GoogleFonts.nunito(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: T.text1),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, _selected),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: T.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: Text('Send',
+                      style: GoogleFonts.nunito(
+                          fontSize: 15, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SlotRow extends StatelessWidget {
+  final String text;
+  final VoidCallback onTap;
+  const _SlotRow({required this.text, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: T.primary.withValues(alpha: 0.35)),
+              ),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined,
+                      size: 17, color: T.primary.withValues(alpha: 0.9)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(text,
+                        style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: T.text1)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Location sharing ───────────────────────────────────────────────────────
+// The tasker can share their current GPS position as a tappable map card
+// (e.g. "I've arrived here"). No free-text field is involved, so it can't be
+// used to pass a phone number; the backend also re-checks any text. Tapping the
+// card opens the device map app for directions.
+
+class _SharedLocation {
+  final double lat;
+  final double lng;
+  final String label;
+  final String address;
+  const _SharedLocation({
+    required this.lat,
+    required this.lng,
+    required this.label,
+    required this.address,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'lat': lat,
+        'lng': lng,
+        'label': label,
+        'address': address,
+      };
+}
+
+Future<void> _openLocationInMaps(Map<String, dynamic> loc) async {
+  final lat = (loc['lat'] as num?)?.toDouble();
+  final lng = (loc['lng'] as num?)?.toDouble();
+  if (lat == null || lng == null) return;
+  final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+/// Bottom sheet: share the tasker's current GPS location.
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet();
+
+  @override
+  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState extends State<_LocationPickerSheet> {
+  bool _locating = false;
+
+  Future<void> _useCurrentLocation() async {
+    setState(() => _locating = true);
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        throw Exception('Location permission denied');
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      if (!mounted) return;
+      Navigator.pop(
+        context,
+        _SharedLocation(
+          lat: pos.latitude,
+          lng: pos.longitude,
+          label: 'My current location',
+          address: '',
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not get your location. Please enable GPS.',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          backgroundColor: T.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color: T.border, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 14),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Text('Share a location',
+                  style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: T.text1)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          ListTile(
+            onTap: _locating ? null : _useCurrentLocation,
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                  color: T.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle),
+              child: _locating
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.my_location_rounded, color: T.primary),
+            ),
+            title: Text('Use my current location',
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800, color: T.text1)),
+            subtitle: Text('Let the customer see where you are',
+                style: GoogleFonts.nunito(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: T.text3)),
+          ),
+          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationCard extends StatelessWidget {
+  final Map<String, dynamic> location;
+  final bool isMine;
+  final double maxWidth;
+  const _LocationCard({
+    required this.location,
+    required this.isMine,
+    required this.maxWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = (location['label'] ?? 'Location').toString();
+    final address = (location['address'] ?? '').toString();
+    final landmark = (location['landmark'] ?? '').toString();
+    return GestureDetector(
+      onTap: () => _openLocationInMaps(location),
+      child: Container(
+        width: maxWidth * 0.72,
+        decoration: BoxDecoration(
+          color: isMine ? Colors.white : T.bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: T.primary.withValues(alpha: 0.25)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 76,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    T.primary.withValues(alpha: 0.16),
+                    T.primary.withValues(alpha: 0.07),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: CustomPaint(painter: _MapLinesPainter()),
+                  ),
+                  const Center(
+                    child: Icon(Icons.location_on,
+                        color: T.primary, size: 32),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: GoogleFonts.nunito(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w800,
+                          color: T.text1)),
+                  if (address.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: T.text3)),
+                  ],
+                  if (landmark.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text('Near $landmark',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.nunito(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: T.text3)),
+                  ],
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.directions_rounded,
+                          size: 15, color: T.primary),
+                      const SizedBox(width: 4),
+                      Text('Open in Maps',
+                          style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: T.primary)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapLinesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = T.primary.withValues(alpha: 0.12)
+      ..strokeWidth = 2;
+    for (double x = -size.height; x < size.width; x += 22) {
+      canvas.drawLine(
+          Offset(x, 0), Offset(x + size.height, size.height), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _PresetComposer extends StatelessWidget {
+  final Future<void> Function(String) onSend;
+  final Future<void> Function(_SharedLocation) onSendLocation;
+  const _PresetComposer(
+      {required this.onSend, required this.onSendLocation});
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-        padding: const EdgeInsets.fromLTRB(6, 4, 4, 4),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: T.border),
+          border: Border(
+              top: BorderSide(color: T.border.withValues(alpha: 0.6))),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
           ],
         ),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Attachment hint
-            IconButton(
-              onPressed: _showAttachmentOptions,
-              icon: Icon(Icons.add_circle_outline_rounded,
-                  color: T.text3.withValues(alpha: 0.6), size: 22),
-              splashRadius: 20,
-            ),
-            Expanded(
-              child: TextField(
-                controller: _composer,
-                onTapOutside: (_) => FocusScope.of(context).unfocus(),
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                style: GoogleFonts.nunito(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: T.text1,
-                ),
-                decoration: InputDecoration(
-                  hintText: AppL10n.of(context)!.msgTypeMessage,
-                  hintStyle: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: T.text3,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            SizedBox(
+              height: 38,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _quickPresets.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => _PresetChip(
+                  text: _quickPresets[i],
+                  onTap: () => onSend(_quickPresets[i]),
                 ),
               ),
             ),
-            _SendButton(onTap: _sendMessage),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _shareLocation(context),
+                    icon: const Icon(Icons.location_on_outlined, size: 18),
+                    label: Text(
+                      'Location',
+                      style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: T.primary,
+                      side:
+                          BorderSide(color: T.primary.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _openPicker(context),
+                    icon: const Icon(Icons.forum_outlined, size: 18),
+                    label: Text(
+                      'More messages',
+                      style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: T.primary,
+                      side:
+                          BorderSide(color: T.primary.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareLocation(BuildContext context) async {
+    final loc = await showModalBottomSheet<_SharedLocation>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => const _LocationPickerSheet(),
+    );
+    if (loc != null) onSendLocation(loc);
+  }
+
+  void _openPicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.72,
+        minChildSize: 0.45,
+        maxChildSize: 0.92,
+        builder: (ctx, scroll) => Column(
+          children: [
+            const SizedBox(height: 10),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: T.border, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Choose a message',
+                    style: GoogleFonts.poppins(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: T.text1)),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'To keep everyone safe, chat uses ready-made messages.',
+                  style: GoogleFonts.nunito(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: T.text3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: ListView(
+                controller: scroll,
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 8, 2, 8),
+                    child: Text('FILL IN THE DETAILS',
+                        style: GoogleFonts.poppins(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w800,
+                            color: T.primary,
+                            letterSpacing: 0.5)),
+                  ),
+                  ..._slotPresets.map((p) => _SlotRow(
+                        text: p.template.replaceFirst('{}', '_____'),
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          final msg = await _resolveSlot(context, p);
+                          if (msg != null) onSend(msg);
+                        },
+                      )),
+                  for (final cat in _presetCategories) ...[
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 14, 2, 8),
+                      child: Text(cat.title.toUpperCase(),
+                          style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              color: T.primary,
+                              letterSpacing: 0.5)),
+                    ),
+                    ...cat.messages.map((m) => _PresetRow(
+                          text: m,
+                          onTap: () {
+                            Navigator.pop(ctx);
+                            onSend(m);
+                          },
+                        )),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -1132,49 +1879,66 @@ class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 }
 
-// ─── Send Button with scale animation ────────────────────────────────────────
-
-class _SendButton extends StatefulWidget {
+class _PresetChip extends StatelessWidget {
+  final String text;
   final VoidCallback onTap;
-  const _SendButton({required this.onTap});
+  const _PresetChip({required this.text, required this.onTap});
 
   @override
-  State<_SendButton> createState() => _SendButtonState();
+  Widget build(BuildContext context) => Material(
+        color: T.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            child: Center(
+              child: Text(text,
+                  style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: T.primaryDark)),
+            ),
+          ),
+        ),
+      );
 }
 
-class _SendButtonState extends State<_SendButton> {
-  bool _pressed = false;
+class _PresetRow extends StatelessWidget {
+  final String text;
+  final VoidCallback onTap;
+  const _PresetRow({required this.text, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) {
-        setState(() => _pressed = false);
-        widget.onTap();
-      },
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.85 : 1.0,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOut,
-        child: Container(
-          width: 42,
-          height: 42,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [T.primaryDark, T.primary],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: T.bg,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(text,
+                        style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: T.text1)),
+                  ),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.send_rounded, size: 16, color: T.primary),
+                ],
+              ),
             ),
-            shape: BoxShape.circle,
           ),
-          alignment: Alignment.center,
-          child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
         ),
-      ),
-    );
-  }
+      );
 }
 
 // ─── Message Bubble ──────────────────────────────────────────────────────────
@@ -1286,6 +2050,12 @@ class _MessageBubbleState extends State<_MessageBubble>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (msg.location != null)
+                      _LocationCard(
+                          location: msg.location!,
+                          isMine: isMine,
+                          maxWidth:
+                              MediaQuery.sizeOf(context).width * 0.75),
                     if (msg.imageUrl != null)
                       GestureDetector(
                         onTap: () {
@@ -1553,6 +2323,7 @@ class _ChatMessage {
     required this.isMine,
     required this.sentAt,
     this.imageUrl,
+    this.location,
   });
 
   final String id;
@@ -1560,6 +2331,7 @@ class _ChatMessage {
   final bool isMine;
   final DateTime sentAt;
   final String? imageUrl;
+  final Map<String, dynamic>? location;
 
   factory _ChatMessage.fromJson(
     Map<String, dynamic> json, {
@@ -1573,5 +2345,8 @@ class _ChatMessage {
         sentAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
             DateTime.now(),
         imageUrl: json['image_url']?.toString(),
+        location: json['location'] is Map
+            ? Map<String, dynamic>.from(json['location'] as Map)
+            : null,
       );
 }

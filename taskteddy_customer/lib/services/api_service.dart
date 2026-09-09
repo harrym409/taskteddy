@@ -533,6 +533,30 @@ class ApiService {
     throw Exception(_errorMessage(res, 'Failed to upload avatar'));
   }
 
+  /// Set the user's display name and (pending) email in one PATCH — used by the
+  /// welcome-bonus claim flow. Only these two fields are sent, so nothing else
+  /// on the profile is touched.
+  static Future<Map<String, dynamic>> setNameAndEmail({
+    required String name,
+    required String email,
+  }) async {
+    final res = await http.patch(
+      Uri.parse('$_base/api/users/me'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'name': name.trim(),
+        'email': email.trim().toLowerCase(),
+      }),
+    );
+    if (res.statusCode == 200) {
+      final user = jsonDecode(res.body) as Map<String, dynamic>;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user', jsonEncode(user));
+      return user;
+    }
+    throw Exception(_errorMessage(res, 'Could not save your details'));
+  }
+
   static Future<Map<String, dynamic>> verifyEmail({
     required String code,
   }) async {
@@ -869,6 +893,54 @@ class ApiService {
       developer.log('Get wallet balance error: $e', name: 'ApiService');
       return null;
     }
+  }
+
+  /// The customer's non-withdrawable TaskTeddy bonus (₹ + discount rules).
+  static Future<Map<String, dynamic>?> getPromoBalance() async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_base/api/wallet/promo'),
+        headers: await _headers(),
+      );
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+      }
+      return null;
+    } catch (e) {
+      developer.log('Get promo balance error: $e', name: 'ApiService');
+      return null;
+    }
+  }
+
+  /// Billing summary for a task: amount, available bonus, net payable.
+  static Future<Map<String, dynamic>?> getTaskCheckout(String taskId) async {
+    try {
+      final res = await http.get(
+        Uri.parse('$_base/api/tasks/$taskId/checkout'),
+        headers: await _headers(),
+      );
+      if (res.statusCode == 200) {
+        return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+      }
+      return null;
+    } catch (e) {
+      developer.log('Get checkout error: $e', name: 'ApiService');
+      return null;
+    }
+  }
+
+  /// Apply / remove the TaskTeddy bonus on a task. Returns the updated summary.
+  static Future<Map<String, dynamic>> applyTaskBonus(String taskId,
+      {required bool apply}) async {
+    final path = apply ? 'apply-bonus' : 'remove-bonus';
+    final res = await http.post(
+      Uri.parse('$_base/api/tasks/$taskId/$path'),
+      headers: await _headers(),
+    );
+    if (res.statusCode == 200 || res.statusCode == 201) {
+      return Map<String, dynamic>.from(jsonDecode(res.body) as Map);
+    }
+    throw Exception(_errorMessage(res, 'Could not update bonus'));
   }
 
   static Future<Map<String, dynamic>> topUpWallet({
@@ -1368,6 +1440,7 @@ class ApiService {
   static Future<bool> sendMessage({
     required String conversationId,
     required String text,
+    Map<String, dynamic>? location,
   }) async {
     try {
       final res = await http.post(
@@ -1376,6 +1449,7 @@ class ApiService {
         body: jsonEncode({
           'text': text,
           'image_url': null,
+          if (location != null) 'location': location,
         }),
       );
       return res.statusCode == 201 || res.statusCode == 200;

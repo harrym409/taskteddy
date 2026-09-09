@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,7 @@ import 'browse.dart';
 import 'profile.dart';
 import 'wallet.dart';
 import '../services/tasker_state.dart';
+import '../services/realtime_service.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -28,14 +30,25 @@ class _ShellState extends State<MainShell> {
     ProfileScreen(),
   ];
 
+  StreamSubscription? _rtSub;
+
   @override
   void initState() {
     super.initState();
     _state.addListener(_onStateChange);
+    RealtimeService().start(); // live task/bid updates
+    // Bridge live "applications changed" pushes to the refresh hub so the
+    // Applied tab reloads instantly when a bid is accepted/rejected.
+    _rtSub = RealtimeService().events.listen((e) {
+      if (e['type'] == 'applications.changed') {
+        _state.notifyApplicationsChanged();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _rtSub?.cancel();
     _state.removeListener(_onStateChange);
     super.dispose();
   }

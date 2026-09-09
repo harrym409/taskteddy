@@ -326,12 +326,18 @@ class _HomeState extends State<HomeScreen>
                     physics: const BouncingScrollPhysics(),
                     slivers: [
                       SliverToBoxAdapter(child: _heroPostCard()),
+                      SliverToBoxAdapter(
+                        child: _PromoCarousel(
+                          onPost: (cat) => _openPostTask(category: cat),
+                        ),
+                      ),
                       SliverToBoxAdapter(child: _activeStatusCard()),
                       SliverToBoxAdapter(child: _ratePromptCard()),
                       SliverToBoxAdapter(child: _howItWorks()),
                       SliverToBoxAdapter(child: _needHelpSection()),
                       SliverToBoxAdapter(child: _recentTasksSection()),
                       SliverToBoxAdapter(child: _trustStrip()),
+                      const SliverToBoxAdapter(child: _BrandFooter()),
                       const SliverToBoxAdapter(child: SizedBox(height: 28)),
                     ],
                   ),
@@ -1886,4 +1892,441 @@ class _IconBtn extends StatelessWidget {
           ],
         ),
       );
+}
+
+// ─── Promo banner carousel (auto-rotating, premium coral cards) ──────────────
+
+class _Promo {
+  final String title;
+  final String subtitle;
+  final String cta;
+  final IconData icon;
+  final List<Color> gradient;
+  final TaskCategory? category; // null → generic "post a task"
+  const _Promo({
+    required this.title,
+    required this.subtitle,
+    required this.cta,
+    required this.icon,
+    required this.gradient,
+    this.category,
+  });
+}
+
+class _PromoCarousel extends StatefulWidget {
+  final void Function(TaskCategory? category) onPost;
+  const _PromoCarousel({required this.onPost});
+
+  @override
+  State<_PromoCarousel> createState() => _PromoCarouselState();
+}
+
+class _PromoCarouselState extends State<_PromoCarousel> {
+  static const _promos = <_Promo>[
+    _Promo(
+      title: 'Post a task,\nget offers fast',
+      subtitle: 'Trusted taskers nearby bid in minutes.',
+      cta: 'Post a Task',
+      icon: Icons.edit_note_rounded,
+      gradient: [C.primary, C.brandInk],
+    ),
+    _Promo(
+      title: 'Sparkling home\ncleaning',
+      subtitle: 'Book a top-rated cleaner today.',
+      cta: 'Book now',
+      icon: Icons.cleaning_services_rounded,
+      gradient: [Color(0xFFFF8A5B), C.primaryDark],
+      category: TaskCategory.cleaning,
+    ),
+    _Promo(
+      title: 'Repairs & fixes,\nsorted',
+      subtitle: 'Plumbing, electrical, carpentry & more.',
+      cta: 'Get help',
+      icon: Icons.build_rounded,
+      gradient: [C.brandInk, Color(0xFFB23A5B)],
+      category: TaskCategory.repair,
+    ),
+    _Promo(
+      title: 'Moving made\neasy',
+      subtitle: 'Packers & movers on demand.',
+      cta: 'Book movers',
+      icon: Icons.local_shipping_rounded,
+      gradient: [Color(0xFFFF7E9D), C.primaryDark],
+      category: TaskCategory.moving,
+    ),
+  ];
+
+  late final PageController _pc;
+  Timer? _timer;
+  int _page = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pc = PageController(viewportFraction: 0.9);
+    _timer = Timer.periodic(const Duration(milliseconds: 4500), (_) {
+      if (!_pc.hasClients) return;
+      final next = (_page + 1) % _promos.length;
+      _pc.animateToPage(next,
+          duration: const Duration(milliseconds: 480), curve: Curves.easeInOut);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pc.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 18),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 158,
+            child: PageView.builder(
+              controller: _pc,
+              itemCount: _promos.length,
+              onPageChanged: (i) => setState(() => _page = i),
+              itemBuilder: (_, i) => _card(_promos[i]),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_promos.length, (i) {
+              final active = i == _page;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 260),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 20 : 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: active
+                      ? C.primary
+                      : C.primary.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(_Promo p) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: GestureDetector(
+          onTap: () => widget.onPost(p.category),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: p.gradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: p.gradient.last.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                // faint decorative circle for depth
+                Positioned(
+                  right: -22,
+                  top: -26,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            p.title,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 19,
+                              height: 1.12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            p.subtitle,
+                            style: GoogleFonts.poppins(
+                              color: Colors.white.withValues(alpha: 0.92),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  p.cta,
+                                  style: GoogleFonts.poppins(
+                                    color: p.gradient.last,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(Icons.arrow_forward_rounded,
+                                    size: 15, color: p.gradient.last),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Icon(p.icon, color: Colors.white, size: 30),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+// ─── Brand footer: real wordmark + animated stat counters ────────────────────
+
+class _BrandFooter extends StatelessWidget {
+  const _BrandFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 32, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 28, 20, 22),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: C.border),
+          boxShadow: [
+            BoxShadow(
+              color: C.primary.withValues(alpha: 0.06),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Real wordmark recoloured to coral pink (keeps the brand script,
+            // tinted from the cream source so it reads on the white card).
+            ColorFiltered(
+              colorFilter: const ColorFilter.mode(C.primary, BlendMode.srcIn),
+              child: Image.asset(
+                'assets/images/logo_wordmark.png',
+                height: 50,
+                fit: BoxFit.contain,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'gets it done',
+              style: GoogleFonts.poppins(
+                color: C.text3,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: const [
+                Expanded(
+                  child: _AnimatedStat(
+                    target: 50,
+                    suffix: 'K+',
+                    label: 'Tasks Posted',
+                    color: C.primary,
+                    delayMs: 0,
+                  ),
+                ),
+                _StatDivider(),
+                Expanded(
+                  child: _AnimatedStat(
+                    target: 12,
+                    suffix: 'K+',
+                    label: 'Trusted Taskers',
+                    color: Color(0xFF12A150),
+                    delayMs: 160,
+                  ),
+                ),
+                _StatDivider(),
+                Expanded(
+                  child: _AnimatedStat(
+                    target: 4.8,
+                    suffix: '★',
+                    label: 'Avg Rating',
+                    color: Color(0xFFF5A623),
+                    decimals: 1,
+                    delayMs: 320,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Loved by thousands across India',
+              style: GoogleFonts.poppins(
+                color: C.text3,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  const _StatDivider();
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 1,
+        height: 36,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              C.border.withValues(alpha: 0),
+              C.border,
+              C.border.withValues(alpha: 0),
+            ],
+          ),
+        ),
+      );
+}
+
+/// A single stat that fades + slides in and counts up from zero. A per-stat
+/// [delayMs] staggers the three so the row animates as a lively cascade.
+class _AnimatedStat extends StatefulWidget {
+  final double target;
+  final String suffix;
+  final String label;
+  final Color color;
+  final int decimals;
+  final int delayMs;
+  const _AnimatedStat({
+    required this.target,
+    required this.suffix,
+    required this.label,
+    required this.color,
+    this.decimals = 0,
+    this.delayMs = 0,
+  });
+
+  @override
+  State<_AnimatedStat> createState() => _AnimatedStatState();
+}
+
+class _AnimatedStatState extends State<_AnimatedStat>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+  late final Animation<double> _count;
+  late final Animation<double> _intro;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1500));
+    _count = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+    _intro = CurvedAnimation(
+        parent: _c, curve: const Interval(0.0, 0.45, curve: Curves.easeOut));
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, __) {
+        final value = widget.target * _count.value;
+        final t = _intro.value;
+        return Opacity(
+          opacity: t.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, (1 - t) * 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${value.toStringAsFixed(widget.decimals)}${widget.suffix}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: widget.color,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.label,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: C.text3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }

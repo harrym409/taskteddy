@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,7 +17,6 @@ import 'wallet.dart';
 import 'completed_tasks.dart';
 import 'my_reviews.dart';
 import 'help_support.dart';
-import 'refer_earn.dart';
 import 'settings.dart';
 import 'availability.dart';
 import 'portfolio.dart';
@@ -45,6 +45,8 @@ class _MyAppState extends State<MyApplicationsScreen>
   final TaskerState _state = TaskerState();
   int _lastAppsRev = 0;
 
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +54,10 @@ class _MyAppState extends State<MyApplicationsScreen>
     _lastAppsRev = _state.applicationsRevision;
     _state.addListener(_onAppsChanged);
     _loadData();
+    // Fallback poll (WS pushes handle the instant case via the refresh hub).
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) _loadData();
+    });
   }
 
   // As a kept-alive shell tab this screen never re-inits, so reload whenever a
@@ -76,6 +82,7 @@ class _MyAppState extends State<MyApplicationsScreen>
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     _state.removeListener(_onAppsChanged);
     _tab.dispose();
     super.dispose();
@@ -1687,15 +1694,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _MI(Icons.star_rate_outlined, l.profileRateUs,
                     onTap: () => _openLink(_playStoreUrl)),
               ]),
-              const SizedBox(height: 14),
-
-              // Refer & Earn
-              Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: AppTheme.card(
-                      borderColor: T.green.withValues(alpha: .35)),
-                  child: _MI(Icons.people_outline, l.profileReferEarn,
-                      hi: true, onTap: () => _push(const ReferEarnScreen()))),
               const SizedBox(height: 14),
 
               // Sign Out

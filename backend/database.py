@@ -191,6 +191,15 @@ class User(Base):
     total_reviews = Column(Integer, nullable=False, default=0)
     coins = Column(Integer, nullable=False, default=0)
     wallet_balance = Column(Float, nullable=False, default=0.0)
+    # Non-withdrawable promo/bonus balance (e.g. the ₹500 signup bonus). Can ONLY
+    # be spent as a discount on a task payment, capped per task so it never
+    # exceeds the platform's own commission — the discount comes out of profit,
+    # never a loss, and the tasker is always paid in full.
+    promo_balance = Column(Float, nullable=False, default=0.0)
+    # The ₹500 welcome bonus is granted ONCE, and only after the customer
+    # completes their profile (name + email) and verifies their email — not on
+    # signup. This flag makes the grant idempotent.
+    signup_bonus_granted = Column(Boolean, nullable=False, default=False)
     is_online = Column(Boolean, nullable=False, default=False)
     # Admin moderation: suspended users cannot log in.
     is_suspended = Column(Boolean, nullable=False, default=False)
@@ -200,6 +209,10 @@ class User(Base):
     cancel_count = Column(Integer, nullable=False, default=0)
     # Lifetime completed jobs — drives the tasker reputation level.
     completed_tasks = Column(Integer, nullable=False, default=0)
+    # Unsettled cash jobs: each cash-paid completion accrues platform commission
+    # owed. Once this reaches the limit the tasker is paused from browsing until
+    # they settle their wallet (cleared back to 0 on settle).
+    pending_cash_jobs = Column(Integer, nullable=False, default=0)
     # KYC identity numbers entered by an admin during verification. Sensitive
     # PII — only the last 4 digits are ever returned to the tasker.
     aadhaar_number = Column(String(32), nullable=True)
@@ -276,6 +289,11 @@ class Task(Base):
     assigned_to = Column(String(64), ForeignKey("tt_users.id"), nullable=True, index=True)
     applicants_count = Column(Integer, nullable=False, default=0)
     completion_otp = Column(String(16), nullable=True)
+    # Promo/bonus discount the customer locked onto this task at checkout. Comes
+    # out of the platform's commission (never below cost); reduces both what the
+    # customer pays and the commission the tasker owes, so the tasker's net is
+    # unchanged. Refunded to the customer's promo_balance if the task is cancelled.
+    promo_discount = Column(Float, nullable=False, default=0.0)
     # Set when the assigned tasker taps "On my way" — powers the live ETA/track UI.
     on_the_way_at = Column(DateTime, nullable=True)
     # Cancellation audit: who cancelled and why (customer or tasker back-out).
@@ -370,6 +388,11 @@ class Message(Base):
     sender_type = Column(String(20), nullable=False, index=True)
     text = Column(Text, nullable=True)
     image_url = Column(Text, nullable=True)
+    # Structured location share: {"lat": float, "lng": float,
+    # "label": str, "address": str, "landmark": str|null}. Lets a customer
+    # send a pin from their address book instead of typing an address (which
+    # the preset-only chat blocks). Rendered as a tappable map card.
+    location = Column(JSON, nullable=True)
     is_read = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
@@ -611,6 +634,22 @@ class PortfolioItem(Base):
     image_url = Column(String(500), nullable=False)
     caption = Column(String(300), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AdminUser(Base):
+    """A portal staff account. role ∈ {superadmin, admin, support}.
+    Superadmins manage the team; each role gets different portal rights."""
+    __tablename__ = "tt_admin_users"
+
+    id = Column(String(64), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    name = Column(String(255), nullable=False, default="")
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(32), nullable=False, default="support")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String(64), nullable=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
 
 def get_db_session():

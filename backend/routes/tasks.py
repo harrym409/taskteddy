@@ -257,6 +257,17 @@ def create_task(
         session.commit()
         session.refresh(new_task)
 
+        # Live push: if it went straight to open (review disabled), taskers see
+        # it immediately. (When it's pending_review, the approve step pushes.)
+        if initial_status == "open":
+            try:
+                from realtime import notify_new_task
+                from routes._helpers import notify_taskers_of_new_task
+                notify_new_task()
+                notify_taskers_of_new_task(session, new_task)
+            except Exception:
+                pass
+
         return {
             "message": (
                 "Task submitted for review"
@@ -439,3 +450,156 @@ def get_task_tasker_location(
             "avatar_url": tasker.avatar_url if tasker else None,
         } if tasker else None,
     }
+
+
+# ── Task payment / checkout (promo bonus redemption) ─────────────────────────
+
+def _task_amount(session: Session, task: Task) -> float:
+    """The agreed price for a task: the accepted bid amount, else the budget."""
+    from database import Application
+    accepted = session.execute(
+        select(Application).where(
+            and_(
+                Application.task_id == task.id,
+                Application.status == "accepted",
+            )
+        )
+    ).scalar_one_or_none()
+    if accepted and accepted.bid_amount is not None:
+        return round(float(accepted.bid_amount), 2)
+    return round(float(task.budget or 0), 2)
+
+
+def _checkout_summary(session: Session, task: Task, customer: User) -> dict:
+    """Billing summary for the task's poster: amount, applicable bonus, and the
+    net the customer pays the tasker after any applied bonus."""
+    from routes._helpers import _commission_pct, promo_cap_for
+
+    amount = _task_amount(session, task)
+    applied = round(float(task.promo_discount or 0.0), 2)
+    promo_balance = round(float(customer.promo_balance or 0.0), 2)
+    cap = promo_cap_for(session, amount)
+    # How much more could still be applied right now (respecting the per-task cap
+    # and the remaining balance), on top of anything already applied.
+    room = max(0.0, round(cap - applied, 2))
+    available = round(min(room, promo_balance), 2)
+    return {
+        "task_id": task.id,
+        "amount": amount,
+        "commission_pct": _commission_pct(session),
+        "promo_balance": promo_balance,
+        "max_promo_for_task": cap,
+        "promo_applied": applied,
+        "promo_available_now": available,
+        "net_payable": round(amount - applied, 2),
+        "can_apply": task.status == "assigned" and available > 0,
+        "can_remove": task.status == "assigned" and applied > 0,
+    }
+
+
+@router.get("/{task_id}/checkout")
+def get_task_checkout(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Billing/checkout summary for the customer — task amount, their available
+    TaskTeddy bonus, and the net payable after any bonus applied."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if current_user["sub"] != task.posted_by:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    customer = session.get(User, task.posted_by)
+    return _checkout_summary(session, task, customer)
+
+
+@router.post("/{task_id}/apply-bonus")
+def apply_task_bonus(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Apply the customer's TaskTeddy bonus to this task, up to the per-task cap
+    (the platform commission) and the customer's remaining balance. The bonus is
+    moved out of promo_balance and locked onto the task."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if current_user["sub"] != task.posted_by:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    if task.status != "assigned":
+        raise HTTPException(
+            status_code=400,
+            detail="A bonus can only be applied once a tasker is assigned and "
+                   "before the task is completed.",
+        )
+    customer = session.get(User, task.posted_by)
+    summary = _checkout_summary(session, task, customer)
+    add = summary["promo_available_now"]
+    if add <= 0:
+        raise HTTPException(status_code=400, detail="No bonus available to apply.")
+
+    import uuid as _uuid
+    from database import Transaction
+
+    customer.promo_balance = round(float(customer.promo_balance or 0.0) - add, 2)
+    customer.updated_at = datetime.utcnow()
+    task.promo_discount = round(float(task.promo_discount or 0.0) + add, 2)
+    task.updated_at = datetime.utcnow()
+    session.add(Transaction(
+        id=str(_uuid.uuid4()),
+        user_id=customer.id,
+        type="promo",
+        amount=-add,
+        description=f"TaskTeddy bonus applied to '{task.title}'",
+        task_id=task.id,
+        created_at=datetime.utcnow(),
+    ))
+    session.commit()
+    session.refresh(task)
+    session.refresh(customer)
+    return _checkout_summary(session, task, customer)
+
+
+@router.post("/{task_id}/remove-bonus")
+def remove_task_bonus(
+    task_id: str,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Undo a bonus applied to this task, refunding it to the customer's
+    promo_balance (only while the task is still in progress)."""
+    task = session.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if current_user["sub"] != task.posted_by:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    if task.status != "assigned":
+        raise HTTPException(
+            status_code=400,
+            detail="A bonus can no longer be changed for this task.",
+        )
+    refund = round(float(task.promo_discount or 0.0), 2)
+    customer = session.get(User, task.posted_by)
+    if refund > 0:
+        import uuid as _uuid
+        from database import Transaction
+
+        customer.promo_balance = round(float(customer.promo_balance or 0.0) + refund, 2)
+        customer.updated_at = datetime.utcnow()
+        task.promo_discount = 0.0
+        task.updated_at = datetime.utcnow()
+        session.add(Transaction(
+            id=str(_uuid.uuid4()),
+            user_id=customer.id,
+            type="promo",
+            amount=refund,
+            description=f"TaskTeddy bonus removed from '{task.title}'",
+            task_id=task.id,
+            created_at=datetime.utcnow(),
+        ))
+        session.commit()
+        session.refresh(task)
+        session.refresh(customer)
+    return _checkout_summary(session, task, customer)

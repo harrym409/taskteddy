@@ -98,6 +98,12 @@ def create_application(
                 emoji="📥")
     session.commit()
     session.refresh(application)
+    # Live push: nudge the customer's task-detail to refetch offers instantly.
+    try:
+        from realtime import notify_new_bid
+        notify_new_bid(task.posted_by, data.task_id)
+    except Exception:
+        pass
     return _application_to_dict(application)
 
 
@@ -193,6 +199,16 @@ def accept_application(
         notify_user(session, other.applicant_id, "Application Update",
                     f"'{task.title}' has been assigned to another tasker.", emoji="📋")
     session.commit()
+    # Live push: refresh every affected tasker's "My Applications" instantly,
+    # and the task is no longer open so nudge the browse feeds too.
+    try:
+        from realtime import notify_applications_changed, notify_new_task
+        notify_applications_changed(application.applicant_id)
+        for other in others:
+            notify_applications_changed(other.applicant_id)
+        notify_new_task()
+    except Exception:
+        pass
     return {"message": "Application accepted successfully"}
 
 

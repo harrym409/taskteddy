@@ -231,12 +231,31 @@ def cancel_task(
     task.on_the_way_at = None
     task.updated_at = datetime.utcnow()
 
+    from database import User as _User
+    from routes._helpers import notify_user
+    customer = session.get(_User, current_user["sub"])
+
+    # Refund any TaskTeddy bonus locked onto this task back to the customer's
+    # promo wallet so it isn't lost when the task is cancelled.
+    refund = round(float(task.promo_discount or 0.0), 2)
+    if refund > 0 and customer:
+        import uuid as _uuid
+        from database import Transaction
+        customer.promo_balance = round(float(customer.promo_balance or 0.0) + refund, 2)
+        task.promo_discount = 0.0
+        session.add(Transaction(
+            id=str(_uuid.uuid4()),
+            user_id=customer.id,
+            type="promo",
+            amount=refund,
+            description=f"TaskTeddy bonus refunded — '{task.title}' cancelled",
+            task_id=task.id,
+            created_at=datetime.utcnow(),
+        ))
+
     # Cancelling an already-committed (assigned) job is a reliability hit and
     # the assigned tasker should be told.
     if was_assigned and assigned_tasker:
-        from database import User as _User
-        from routes._helpers import notify_user
-        customer = session.get(_User, current_user["sub"])
         if customer:
             customer.cancel_count = int(customer.cancel_count or 0) + 1
         notify_user(session, assigned_tasker, "Job cancelled",

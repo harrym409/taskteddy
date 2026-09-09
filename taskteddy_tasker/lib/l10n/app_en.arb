@@ -1,4 +1,13 @@
 {
+  "walletDuesSettled": "Dues settled — you can browse again.",
+  "browseDuesTitle": "Browsing paused",
+  "@browseDuesTitle": { "description": "Cash-dues pause screen title" },
+  "browseDuesBody": "You have unsettled platform fees from cash jobs. Settle your wallet to continue browsing tasks.",
+  "@browseDuesBody": { "description": "Cash-dues pause screen body" },
+  "browseDuesAmount": "Dues: ₹{amount}",
+  "@browseDuesAmount": { "placeholders": { "amount": { "type": "String" } } },
+  "browseSettleNow": "Settle now",
+  "@browseSettleNow": { "description": "Settle dues button" },
   "@@locale": "en",
   "appTagline": "Find tasks & earn money on your schedule!",
   "@appTagline": {
@@ -1272,6 +1281,7 @@
   "browseEstTakeHome": "Estimated Take-Home",
   "browseAfterFee": "after 10% platform fee",
   "browseCoverLetter": "Cover Letter *",
+  "browseCoverLetterOptional": "Cover letter (optional)",
   "browseCoverHint": "Introduce yourself. Why are you the best fit? Mention your experience and availability...",
   "browseCoverTip": "Good cover letters increase selection chance by 70%",
   "browseFeeNote": "TaskTeddy charges 10% platform fee only when a task is completed.",

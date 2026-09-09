@@ -521,101 +521,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _buildReferCard() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(22),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReferEarnScreen()),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFF7DE), Color(0xFFFFEFBA)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFFF6DD92)),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFCA9C00).withValues(alpha: .14),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .75),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white),
-                  ),
-                  child: const Icon(Icons.card_giftcard_outlined,
-                      color: Color(0xFFB97A00), size: 24),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppL10n.of(context)!.profileReferEarn,
-                        style: GoogleFonts.poppins(
-                          color: C.text1,
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        AppL10n.of(context)!.profileInviteFriends,
-                        style: GoogleFonts.poppins(
-                          color: C.text2,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .92),
-                    borderRadius: BorderRadius.circular(100),
-                  ),
-                  child: Text(
-                    AppL10n.of(context)!.profileUpTo100,
-                    style: GoogleFonts.poppins(
-                      color: const Color(0xFF9F6E00),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: C.text2, size: 28),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildMenuList() {
     final t = AppL10n.of(context)!;
     final menuItems = [
@@ -881,8 +786,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Center(child: CircularProgressIndicator(color: C.primary)),
               )
             else ...[
+              const BonusBanner(),
+              const SizedBox(height: 8),
               _buildQuickActions(),
-              _buildReferCard(),
               _buildMenuList(),
               const SizedBox(height: 24),
             ],
@@ -2397,6 +2303,657 @@ class _ChoicePill extends StatelessWidget {
   }
 }
 
+/// A compact banner shown on the Profile screen: the customer's TaskTeddy bonus
+/// balance, tappable to open the full bonus screen. Self-loading so it doesn't
+/// depend on the parent's state.
+class BonusBanner extends StatefulWidget {
+  const BonusBanner({super.key});
+
+  @override
+  State<BonusBanner> createState() => _BonusBannerState();
+}
+
+class _BonusBannerState extends State<BonusBanner> {
+  double _promo = 0;
+  double _pct = 10;
+  double _signupBonus = 500;
+  bool _pending = false; // customer hasn't claimed the welcome bonus yet
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final p = await ApiService.getPromoBalance();
+    if (!mounted) return;
+    setState(() {
+      if (p != null) {
+        _promo = (p['promo_balance'] as num?)?.toDouble() ?? 0;
+        _pct = (p['max_discount_pct'] as num?)?.toDouble() ?? 10;
+        _signupBonus = (p['signup_bonus'] as num?)?.toDouble() ?? 500;
+        _pending = p['bonus_pending'] == true;
+      }
+      _loaded = true;
+    });
+  }
+
+  String _money(double v) => v % 1 == 0 ? '₹${v.toInt()}' : '₹${v.toStringAsFixed(2)}';
+
+  Future<void> _openClaim() async {
+    final claimed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const ClaimBonusScreen()),
+    );
+    if (claimed == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎁 ₹${_signupBonus.toInt()} bonus added!',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+          backgroundColor: C.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) return const SizedBox.shrink();
+
+    // Un-claimed welcome bonus → a "claim" call-to-action that stays until done.
+    if (_pending) {
+      final title = 'Claim your ₹${_signupBonus.toInt()} welcome bonus';
+      const subtitle = 'Add your name & verify your email to unlock it';
+      return _card(
+        onTap: _openClaim,
+        icon: Icons.card_giftcard_rounded,
+        titleTop: 'WELCOME GIFT',
+        titleBig: title,
+        subtitle: subtitle,
+        big: false,
+      );
+    }
+
+    // Claimed → show the balance, opens the full bonus screen.
+    return _card(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TaskTeddyBonusScreen()),
+        );
+        _load();
+      },
+      icon: Icons.card_giftcard_rounded,
+      titleTop: 'TASKTEDDY BONUS',
+      titleBig: _money(_promo),
+      subtitle: _promo > 0
+          ? 'Save up to ${_pct.toInt()}% on every task payment'
+          : 'Used up — thanks for using TaskTeddy!',
+      big: true,
+    );
+  }
+
+  Widget _card({
+    required VoidCallback onTap,
+    required IconData icon,
+    required String titleTop,
+    required String titleBig,
+    required String subtitle,
+    required bool big,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [C.primary, C.primaryDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: C.primary.withValues(alpha: 0.3),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(titleTop,
+                          style: GoogleFonts.poppins(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              letterSpacing: 0.4,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 2),
+                      Text(titleBig,
+                          style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: big ? 26 : 16,
+                              height: 1.1,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: GoogleFonts.nunito(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.white),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Welcome-bonus claim flow: collect first/last name + email, verify the email
+/// with a 6-digit code, and the ₹500 is credited server-side on verification.
+class ClaimBonusScreen extends StatefulWidget {
+  const ClaimBonusScreen({super.key});
+
+  @override
+  State<ClaimBonusScreen> createState() => _ClaimBonusScreenState();
+}
+
+class _ClaimBonusScreenState extends State<ClaimBonusScreen> {
+  final _first = TextEditingController();
+  final _last = TextEditingController();
+  final _email = TextEditingController();
+  final _code = TextEditingController();
+
+  int _step = 0; // 0 = details, 1 = verify code
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _last.dispose();
+    _email.dispose();
+    _code.dispose();
+    super.dispose();
+  }
+
+  bool _validEmail(String s) =>
+      RegExp(r'^[\w.+-]+@[\w-]+\.[\w.-]+$').hasMatch(s.trim());
+
+  Future<void> _submitDetails() async {
+    final first = _first.text.trim();
+    final last = _last.text.trim();
+    final email = _email.text.trim();
+    if (first.isEmpty || last.isEmpty) {
+      setState(() => _error = 'Please enter your first and last name.');
+      return;
+    }
+    if (!_validEmail(email)) {
+      setState(() => _error = 'Please enter a valid email address.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      try {
+        await ApiService.setNameAndEmail(name: '$first $last', email: email);
+      } catch (e) {
+        // If a verification is already pending for this email, keep going.
+        if (!e.toString().toLowerCase().contains('pending')) rethrow;
+      }
+      await ApiService.requestEmailVerification();
+      if (!mounted) return;
+      setState(() {
+        _step = 1;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _verify() async {
+    final code = _code.text.trim();
+    if (code.length < 4) {
+      setState(() => _error = 'Enter the code we emailed you.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await ApiService.verifyEmail(code: code);
+      if (!mounted) return;
+      Navigator.pop(context, true); // bonus credited server-side
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
+
+  Future<void> _resend() async {
+    try {
+      await ApiService.requestEmailVerification();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Code re-sent to ${_email.text.trim()}',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: C.bg,
+      appBar: AppBar(
+        backgroundColor: C.bg,
+        elevation: 0,
+        title: Text('Claim ₹500 Bonus',
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w800, color: C.text1)),
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [C.primary, C.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.card_giftcard_rounded,
+                      color: Colors.white, size: 34),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'Verify your email to unlock ₹500 in TaskTeddy bonus — '
+                      'save up to 10% on every task.',
+                      style: GoogleFonts.nunito(
+                          color: Colors.white,
+                          fontSize: 13.5,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 22),
+            if (_step == 0) ..._detailsStep() else ..._verifyStep(),
+            if (_error != null) ...[
+              const SizedBox(height: 14),
+              Text(_error!,
+                  style: GoogleFonts.nunito(
+                      color: C.red, fontWeight: FontWeight.w700)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _detailsStep() => [
+        _label('First name'),
+        _field(_first, hint: 'First name', textCap: TextCapitalization.words),
+        const SizedBox(height: 14),
+        _label('Last name'),
+        _field(_last, hint: 'Last name', textCap: TextCapitalization.words),
+        const SizedBox(height: 14),
+        _label('Email address'),
+        _field(_email,
+            hint: 'you@example.com',
+            keyboard: TextInputType.emailAddress),
+        const SizedBox(height: 24),
+        _primaryButton('Continue', _busy ? null : _submitDetails),
+      ];
+
+  List<Widget> _verifyStep() => [
+        Text('We sent a 6-digit code to',
+            style: GoogleFonts.nunito(
+                color: C.text2, fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(_email.text.trim(),
+            style: GoogleFonts.nunito(
+                color: C.text1, fontWeight: FontWeight.w800, fontSize: 15)),
+        const SizedBox(height: 16),
+        _label('Verification code'),
+        _field(_code,
+            hint: '------',
+            keyboard: TextInputType.number,
+            formatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ]),
+        const SizedBox(height: 24),
+        _primaryButton('Verify & claim ₹500', _busy ? null : _verify),
+        const SizedBox(height: 8),
+        Center(
+          child: TextButton(
+            onPressed: _busy ? null : _resend,
+            child: Text('Resend code',
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w700, color: C.primary)),
+          ),
+        ),
+      ];
+
+  Widget _label(String s) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(s,
+            style: GoogleFonts.nunito(
+                fontSize: 13, fontWeight: FontWeight.w700, color: C.text2)),
+      );
+
+  Widget _field(TextEditingController c,
+          {required String hint,
+          TextInputType? keyboard,
+          TextCapitalization textCap = TextCapitalization.none,
+          List<TextInputFormatter>? formatters}) =>
+      TextField(
+        controller: c,
+        keyboardType: keyboard,
+        textCapitalization: textCap,
+        inputFormatters: formatters,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+        style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: C.text1),
+        decoration: InputDecoration(
+          hintText: hint,
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: C.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: C.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: C.primary, width: 1.5),
+          ),
+        ),
+      );
+
+  Widget _primaryButton(String label, VoidCallback? onTap) => SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: onTap,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: C.primary,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 15),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          child: _busy
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : Text(label,
+                  style: GoogleFonts.nunito(
+                      fontSize: 15, fontWeight: FontWeight.w800)),
+        ),
+      );
+}
+
+/// Full bonus screen: balance, how-it-works, and bonus/discount history.
+class TaskTeddyBonusScreen extends StatefulWidget {
+  const TaskTeddyBonusScreen({super.key});
+
+  @override
+  State<TaskTeddyBonusScreen> createState() => _TaskTeddyBonusScreenState();
+}
+
+class _TaskTeddyBonusScreenState extends State<TaskTeddyBonusScreen> {
+  double _promo = 0;
+  double _pct = 10;
+  List<Map<String, dynamic>> _history = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final results = await Future.wait<dynamic>([
+      ApiService.getPromoBalance(),
+      ApiService.getWalletTransactions(limit: 50),
+    ]);
+    final p = results[0] as Map<String, dynamic>?;
+    final txns = (results[1] as List<Map<String, dynamic>>?) ?? const [];
+    if (!mounted) return;
+    setState(() {
+      if (p != null) {
+        _promo = (p['promo_balance'] as num?)?.toDouble() ?? 0;
+        _pct = (p['max_discount_pct'] as num?)?.toDouble() ?? 10;
+      }
+      _history = txns
+          .where((t) => t['type'] == 'bonus' || t['type'] == 'promo')
+          .toList();
+      _loading = false;
+    });
+  }
+
+  String _money(double v) => v % 1 == 0 ? '₹${v.toInt()}' : '₹${v.toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: C.bg,
+      appBar: AppBar(
+        backgroundColor: C.bg,
+        elevation: 0,
+        title: Text('TaskTeddy Bonus',
+            style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w800, color: C.text1)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Balance card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [C.primary, C.primaryDark],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Column(
+                      children: [
+                        Text('Available bonus',
+                            style: GoogleFonts.poppins(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text(_money(_promo),
+                            style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontSize: 46,
+                                height: 1,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        Text('Applied automatically at checkout on your tasks',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.nunito(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  // How it works
+                  Text('How it works',
+                      style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: C.text1)),
+                  const SizedBox(height: 10),
+                  _howRow(Icons.percent_rounded,
+                      'Save up to ${_pct.toInt()}% on each task',
+                      'Your bonus covers up to ${_pct.toInt()}% of a task; you pay the rest.'),
+                  _howRow(Icons.repeat_rounded, 'Use it across many tasks',
+                      'The balance keeps working task after task until it runs out.'),
+                  _howRow(Icons.verified_user_outlined, 'No catch',
+                      'It only discounts task payments — it can\'t be withdrawn as cash.'),
+                  const SizedBox(height: 20),
+                  Text('History',
+                      style: GoogleFonts.poppins(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: C.text1)),
+                  const SizedBox(height: 10),
+                  if (_history.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(
+                        child: Text('No bonus activity yet.',
+                            style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w600, color: C.text3)),
+                      ),
+                    )
+                  else
+                    ..._history.map(_historyTile),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _howRow(IconData icon, String title, String body) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                  color: C.primary.withValues(alpha: 0.1),
+                  shape: BoxShape.circle),
+              child: Icon(icon, color: C.primary, size: 19),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: C.text1)),
+                  Text(body,
+                      style: GoogleFonts.nunito(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: C.text3,
+                          height: 1.35)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _historyTile(Map<String, dynamic> t) {
+    final amount = (t['amount'] as num?)?.toDouble() ?? 0;
+    final credit = amount >= 0;
+    final desc = t['description']?.toString() ?? '';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: C.border),
+      ),
+      child: Row(
+        children: [
+          Icon(credit ? Icons.add_circle_outline : Icons.remove_circle_outline,
+              color: credit ? C.green : C.primary, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(desc,
+                style: GoogleFonts.nunito(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: C.text1)),
+          ),
+          const SizedBox(width: 8),
+          Text('${credit ? '+' : ''}${_money(amount)}',
+              style: GoogleFonts.nunito(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: credit ? C.green : C.primary)),
+        ],
+      ),
+    );
+  }
+}
+
 class TaskTeddyWalletScreen extends StatefulWidget {
   const TaskTeddyWalletScreen({super.key});
 
@@ -2406,6 +2963,8 @@ class TaskTeddyWalletScreen extends StatefulWidget {
 
 class _TaskTeddyWalletScreenState extends State<TaskTeddyWalletScreen> {
   double _balance = 0;
+  double _promo = 0;
+  double _promoPct = 10;
   double _selectedAmount = 250;
   List<Map<String, dynamic>> _transactions = [];
   late final TextEditingController _amountController;
@@ -2441,13 +3000,19 @@ class _TaskTeddyWalletScreenState extends State<TaskTeddyWalletScreen> {
     final results = await Future.wait<dynamic>([
       ApiService.getWalletBalance(),
       ApiService.getWalletTransactions(limit: 10),
+      ApiService.getPromoBalance(),
     ]);
     final balance = (results[0] as double?) ?? 0;
     final txns = (results[1] as List<Map<String, dynamic>>?) ?? const [];
+    final promo = results[2] as Map<String, dynamic>?;
     if (!mounted) return;
     setState(() {
       _balance = balance;
       _transactions = txns;
+      if (promo != null) {
+        _promo = (promo['promo_balance'] as num?)?.toDouble() ?? 0;
+        _promoPct = (promo['max_discount_pct'] as num?)?.toDouble() ?? 10;
+      }
       _loading = false;
     });
   }
@@ -2777,6 +3342,59 @@ class _TaskTeddyWalletScreenState extends State<TaskTeddyWalletScreen> {
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+                            if (_promo > 0) ...[
+                              const SizedBox(height: 14),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: C.primary.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: C.primary.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: BoxDecoration(
+                                        color: C.primary.withValues(alpha: 0.15),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                          Icons.card_giftcard_rounded,
+                                          color: C.primary),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text('TaskTeddy Bonus',
+                                              style: GoogleFonts.poppins(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: C.text2)),
+                                          Text(_formatRupee(_promo),
+                                              style: GoogleFonts.poppins(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: C.primary)),
+                                          Text(
+                                              'Save up to ${_promoPct.toInt()}% on every task payment',
+                                              style: GoogleFonts.nunito(
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: C.text3)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 14),
                             Container(
                               width: double.infinity,

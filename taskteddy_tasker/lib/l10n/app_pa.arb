@@ -1,4 +1,9 @@
 {
+  "walletDuesSettled": "ਬਕਾਇਆ ਸੈਟਲ — ਹੁਣ ਤੁਸੀਂ ਫਿਰ ਬ੍ਰਾਊਜ਼ ਕਰ ਸਕਦੇ ਹੋ।",
+  "browseDuesTitle": "ਬ੍ਰਾਊਜ਼ਿੰਗ ਰੁਕੀ ਹੋਈ ਹੈ",
+  "browseDuesBody": "ਨਕਦ ਕੰਮਾਂ ਤੋਂ ਤੁਹਾਡੀਆਂ ਪਲੇਟਫਾਰਮ ਫੀਸਾਂ ਬਕਾਇਆ ਹਨ। ਕੰਮ ਬ੍ਰਾਊਜ਼ ਕਰਨਾ ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣਾ ਵਾਲਿਟ ਸੈਟਲ ਕਰੋ।",
+  "browseDuesAmount": "ਬਕਾਇਆ: ₹{amount}",
+  "browseSettleNow": "ਹੁਣੇ ਸੈਟਲ ਕਰੋ",
   "@@locale": "pa",
   "appTagline": "ਆਪਣੇ ਸਮੇਂ ਅਨੁਸਾਰ ਕੰਮ ਲੱਭੋ ਅਤੇ ਪੈਸੇ ਕਮਾਓ!",
   "navHome": "ਹੋਮ",
@@ -573,6 +578,7 @@
   "browseEstTakeHome": "ਅਨੁਮਾਨਿਤ ਸ਼ੁੱਧ ਰਕਮ",
   "browseAfterFee": "10% ਪਲੇਟਫਾਰਮ ਫੀਸ ਤੋਂ ਬਾਅਦ",
   "browseCoverLetter": "ਕਵਰ ਲੈਟਰ *",
+  "browseCoverLetterOptional": "ਕਵਰ ਲੈਟਰ (ਵਿਕਲਪਿਕ)",
   "browseCoverHint": "ਆਪਣਾ ਪਰਿਚੈ ਦਿਓ। ਤੁਸੀਂ ਸਭ ਤੋਂ ਢੁਕਵੇਂ ਕਿਉਂ ਹੋ? ਆਪਣਾ ਤਜਰਬਾ ਅਤੇ ਉਪਲਬਧਤਾ ਦੱਸੋ...",
   "browseCoverTip": "ਵਧੀਆ ਕਵਰ ਲੈਟਰ ਚੋਣ ਦੀ ਸੰਭਾਵਨਾ 70% ਵਧਾਉਂਦੇ ਹਨ",
   "browseFeeNote": "TaskTeddy ਸਿਰਫ਼ ਕੰਮ ਪੂਰਾ ਹੋਣ 'ਤੇ 10% ਪਲੇਟਫਾਰਮ ਫੀਸ ਲੈਂਦਾ ਹੈ।",

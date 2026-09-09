@@ -509,10 +509,22 @@ export interface AnalyticsPayouts {
 }
 
 // Auth types
+export type AdminRole = "superadmin" | "admin" | "support";
+
 export interface Admin {
   id: string;
   email: string;
   name: string;
+  role?: AdminRole;
+}
+
+export interface TeamMember {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRole;
+  is_active: boolean;
+  created_at: string;
 }
 
 export interface AuthResponse {

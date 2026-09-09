@@ -99,6 +99,36 @@ abstract class AppL10n {
     Locale('pa')
   ];
 
+  /// No description provided for @walletDuesSettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Dues settled — you can browse again.'**
+  String get walletDuesSettled;
+
+  /// Cash-dues pause screen title
+  ///
+  /// In en, this message translates to:
+  /// **'Browsing paused'**
+  String get browseDuesTitle;
+
+  /// Cash-dues pause screen body
+  ///
+  /// In en, this message translates to:
+  /// **'You have unsettled platform fees from cash jobs. Settle your wallet to continue browsing tasks.'**
+  String get browseDuesBody;
+
+  /// No description provided for @browseDuesAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Dues: ₹{amount}'**
+  String browseDuesAmount(String amount);
+
+  /// Settle dues button
+  ///
+  /// In en, this message translates to:
+  /// **'Settle now'**
+  String get browseSettleNow;
+
   /// Login screen tagline under the wordmark
   ///
   /// In en, this message translates to:
@@ -3536,6 +3566,12 @@ abstract class AppL10n {
   /// In en, this message translates to:
   /// **'Cover Letter *'**
   String get browseCoverLetter;
+
+  /// No description provided for @browseCoverLetterOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover letter (optional)'**
+  String get browseCoverLetterOptional;
 
   /// No description provided for @browseCoverHint.
   ///

@@ -209,6 +209,7 @@ def task_to_response(
         "assigned_to": assigned_to,
         "applicants_count": int(task.applicants_count or 0),
         "completion_otp": task.completion_otp,
+        "promo_discount": float(getattr(task, "promo_discount", 0.0) or 0.0),
         "on_the_way_at": getattr(task, "on_the_way_at", None),
         "cancel_reason": getattr(task, "cancel_reason", None),
         "cancelled_by": getattr(task, "cancelled_by", None),
@@ -354,6 +355,14 @@ def release_pending_tasks(session) -> int:
                     f"'{t.title}' passed review and is now live for taskers.",
                     emoji="✅")
     session.commit()
+    # Newly-live tasks: notify taskers in each region + refresh browse feeds.
+    try:
+        from realtime import notify_new_task
+        for t in stale:
+            notify_taskers_of_new_task(session, t)
+        notify_new_task()
+    except Exception:
+        pass
     return len(stale)
 
 
@@ -368,13 +377,84 @@ def _commission_pct(session) -> float:
     return 10.0
 
 
+# ── Promo / signup-bonus tunables ────────────────────────────────────────────
+# Early-marketing signup bonus credited to a new customer's promo_balance.
+SIGNUP_BONUS = 500.0
+# Max share of a task's value that the promo bonus may discount. Kept at (or
+# below) the commission percent so the discount always comes out of the
+# platform's own margin — never a loss, and the tasker is paid in full.
+PROMO_MAX_PCT = 10.0
+
+
+def grant_signup_bonus_if_eligible(session, user) -> float:
+    """Credit the one-time ₹500 welcome bonus to a customer's promo wallet, but
+    only once they have completed their profile and VERIFIED their email.
+
+    Idempotent: guarded by ``signup_bonus_granted`` so it can be called from
+    every email-verification path without ever double-crediting. Returns the
+    amount granted (0.0 if not eligible or already granted). Does not commit —
+    the caller's transaction does.
+    """
+    import uuid as _uuid
+    from datetime import datetime as _dt
+
+    from database import Transaction
+
+    if user is None or SIGNUP_BONUS <= 0:
+        return 0.0
+    if getattr(user, "user_type", None) != "customer":
+        return 0.0
+    if getattr(user, "signup_bonus_granted", False):
+        return 0.0
+    if not (getattr(user, "email", None) and getattr(user, "email_verified_at", None)):
+        return 0.0
+
+    user.promo_balance = round(float(user.promo_balance or 0.0) + float(SIGNUP_BONUS), 2)
+    user.signup_bonus_granted = True
+    user.updated_at = _dt.utcnow()
+    session.add(Transaction(
+        id=str(_uuid.uuid4()),
+        user_id=user.id,
+        type="bonus",
+        amount=float(SIGNUP_BONUS),
+        description="Welcome bonus unlocked — email verified",
+        task_id=None,
+        created_at=_dt.utcnow(),
+    ))
+    try:
+        notify_user(session, user.id, "🎁 ₹500 bonus unlocked!",
+                    f"Your TaskTeddy welcome bonus of ₹{SIGNUP_BONUS:.0f} is ready — "
+                    "save up to 10% on every task.", emoji="🎁")
+    except Exception:
+        pass
+    return float(SIGNUP_BONUS)
+
+
+def promo_cap_for(session, gross: float) -> float:
+    """The most promo/bonus (₹) that may be applied to a task of this value.
+
+    This is min(commission on the task, PROMO_MAX_PCT of the task) so it can
+    never exceed the platform's profit on the job — guaranteeing no loss.
+    """
+    gross = max(0.0, round(float(gross), 2))
+    commission = gross * _commission_pct(session) / 100.0
+    cap_pct = gross * PROMO_MAX_PCT / 100.0
+    return round(min(commission, cap_pct), 2)
+
+
 def charge_commission(session, tasker_id: str, gross: float, description: str,
-                      task_id: str | None = None) -> dict:
+                      task_id: str | None = None, discount: float = 0.0) -> dict:
     """Cash-paid job: the customer handed the tasker cash directly, so instead
     of crediting the tasker we record the platform commission the tasker now
     owes. Debits their wallet by the commission (a running balance they keep
     topped up) and writes a `commission` Transaction for admin revenue stats.
-    Returns {gross, commission, net, method}.
+
+    ``discount`` is any promo/bonus the customer applied to this task. It is
+    clamped to at most the full commission (so profit never goes negative) and
+    reduces the commission the tasker owes by the same amount — because the
+    customer already paid the tasker that much less in cash, the tasker's net
+    take-home is unchanged. Returns
+    {gross, commission, commission_full, discount, collected, net, method}.
     """
     import uuid as _uuid
     from datetime import datetime as _dt
@@ -383,24 +463,85 @@ def charge_commission(session, tasker_id: str, gross: float, description: str,
 
     pct = _commission_pct(session)
     gross = round(float(gross), 2)
-    commission = round(gross * pct / 100.0, 2)
-    net = round(gross - commission, 2)
+    commission_full = round(gross * pct / 100.0, 2)
+    discount = round(max(0.0, min(float(discount or 0.0), commission_full)), 2)
+    commission = round(commission_full - discount, 2)  # what the tasker owes
+    collected = round(gross - discount, 2)  # cash the customer actually handed over
+    net = round(gross - commission_full, 2)  # tasker take-home (unchanged by promo)
 
     tasker = session.get(User, tasker_id)
     if tasker:
         tasker.wallet_balance = round(float(tasker.wallet_balance or 0.0) - commission, 2)
+        # Count this as an unsettled cash job — the browse gate pauses the tasker
+        # once too many pile up, until they settle their wallet.
+        tasker.pending_cash_jobs = int(tasker.pending_cash_jobs or 0) + 1
         tasker.updated_at = _dt.utcnow()
 
+    desc = f"{description} — platform fee {pct:.0f}% on ₹{gross:.0f} (cash job)"
+    if discount > 0:
+        desc += f"; ₹{discount:.0f} covered by customer's TaskTeddy bonus"
     session.add(Transaction(
         id=str(_uuid.uuid4()),
         user_id=tasker_id,
         type="commission",
         amount=-commission,
-        description=f"{description} — platform fee {pct:.0f}% on ₹{gross:.0f} (cash job)",
+        description=desc,
         task_id=task_id,
         created_at=_dt.utcnow(),
     ))
-    return {"gross": gross, "commission": commission, "net": net, "method": "cash"}
+    return {
+        "gross": gross,
+        "commission": commission,
+        "commission_full": commission_full,
+        "discount": discount,
+        "collected": collected,
+        "net": net,
+        "method": "cash",
+    }
+
+
+def notify_taskers_of_new_task(session, task, radius_km: float = 40.0) -> None:
+    """Notify taskers in the task's region that a new task went live.
+
+    Geotagged tasks notify taskers within ``radius_km`` (plus taskers whose
+    location is unknown — they see every task anyway). Un-geotagged tasks notify
+    all active taskers. Best-effort: never let a notification failure break the
+    request that triggered it."""
+    try:
+        from sqlalchemy import select as _select
+        from database import User as _User
+        from utils.geolocation import haversine_distance
+
+        taskers = (
+            session.execute(
+                _select(_User)
+                .where(_User.user_type == "tasker", _User.is_suspended.is_(False))
+                .limit(2000)
+            )
+            .scalars()
+            .all()
+        )
+        has_coords = task.latitude is not None and task.longitude is not None
+        budget = float(task.budget or 0)
+        notified = 0
+        for t in taskers:
+            if t.id == task.posted_by:
+                continue
+            if has_coords and t.latitude is not None and t.longitude is not None:
+                d = haversine_distance(
+                    task.latitude, task.longitude, t.latitude, t.longitude
+                )
+                if d > radius_km:
+                    continue
+                body = f"'{task.title}' posted ~{d:.0f} km away · ₹{budget:.0f}."
+            else:
+                body = f"'{task.title}' is now available · ₹{budget:.0f}."
+            notify_user(session, t.id, "New task nearby", body, emoji="🆕")
+            notified += 1
+        if notified:
+            session.commit()
+    except Exception:
+        pass
 
 
 def notify_user(session, user_id: str, title: str, body: str, emoji: str = "💰") -> None:

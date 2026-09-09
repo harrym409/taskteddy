@@ -9,6 +9,25 @@ class AppL10nHi extends AppL10n {
   AppL10nHi([String locale = 'hi']) : super(locale);
 
   @override
+  String get walletDuesSettled =>
+      'बकाया चुकता — अब आप फिर से ब्राउज़ कर सकते हैं।';
+
+  @override
+  String get browseDuesTitle => 'ब्राउज़िंग रुकी हुई है';
+
+  @override
+  String get browseDuesBody =>
+      'नकद कामों से आपके प्लेटफ़ॉर्म शुल्क बकाया हैं। कार्य ब्राउज़ करना जारी रखने के लिए अपना वॉलेट सेटल करें।';
+
+  @override
+  String browseDuesAmount(String amount) {
+    return 'बकाया: ₹$amount';
+  }
+
+  @override
+  String get browseSettleNow => 'अभी सेटल करें';
+
+  @override
   String get appTagline => 'अपने समय के अनुसार काम पाएँ और पैसे कमाएँ!';
 
   @override
@@ -1924,6 +1943,9 @@ class AppL10nHi extends AppL10n {
 
   @override
   String get browseCoverLetter => 'कवर लेटर *';
+
+  @override
+  String get browseCoverLetterOptional => 'कवर लेटर (वैकल्पिक)';
 
   @override
   String get browseCoverHint =>

@@ -5,6 +5,7 @@ import '../theme/theme.dart';
 import 'home.dart';
 import 'tasks.dart';
 import 'profile.dart';
+import '../services/realtime_service.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key, this.initialIndex = 0});
@@ -20,13 +21,19 @@ class _ShellState extends State<MainShell> {
   List<Widget> get _screens => [
         const HomeScreen(),
         // "Tasks" tab shows only open tasks (still awaiting a tasker).
-        const MyTasksScreen(sections: [TaskSection.open]),
+        // Distinct keys are REQUIRED: both tabs are MyTasksScreen, so without
+        // them Flutter reuses one State across configs and the TabController
+        // keeps the wrong tab count (breaks the Done tab).
+        const MyTasksScreen(
+            key: ValueKey('tasks-open'), sections: [TaskSection.open]),
         // After a successful post, jump to the Tasks tab (rebuilt fresh so the
         // new task appears) instead of a dead-end pop.
         PostTaskScreen(onPosted: () => setState(() => _i = 1)),
         // "Active" tab shows in-progress jobs plus finished ones
         // (replaces the old service Bookings tab).
-        const MyTasksScreen(sections: [TaskSection.active, TaskSection.done]),
+        const MyTasksScreen(
+            key: ValueKey('tasks-active-done'),
+            sections: [TaskSection.active, TaskSection.done]),
         const ProfileScreen(),
       ];
 
@@ -34,6 +41,7 @@ class _ShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _i = widget.initialIndex.clamp(0, _tabCount - 1);
+    RealtimeService().start(); // live bid updates on task detail
   }
 
   @override

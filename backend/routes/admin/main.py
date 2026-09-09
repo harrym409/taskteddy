@@ -71,10 +71,18 @@ def verify_admin_credentials(email: str, password: str) -> bool:
 # ============================================================================
 # Admin Authentication Dependency
 # ============================================================================
+# Portal roles, highest privilege first.
+ADMIN_ROLES = ("superadmin", "admin", "support")
+
+
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> dict:
-    """Verify admin JWT token."""
+    """Verify a portal (admin/superadmin/support) JWT and return its claims.
+
+    The returned dict carries ``role`` ∈ {superadmin, admin, support} and
+    ``admin_id`` so downstream handlers can enforce per-role permissions.
+    """
     from jose import JWTError, jwt
 
     token = credentials.credentials
@@ -85,7 +93,7 @@ async def get_current_admin(
             algorithms=[settings["JWT_ALGORITHM"]]
         )
         role = payload.get("role")
-        if role != "admin":
+        if role not in ADMIN_ROLES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin access required"
@@ -96,6 +104,38 @@ async def get_current_admin(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token"
         )
+
+
+def require_admin_roles(*allowed: str):
+    """Dependency factory that restricts an endpoint to the given portal roles."""
+    async def _checker(admin: dict = Depends(get_current_admin)) -> dict:
+        if admin.get("role") not in allowed:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have permission to perform this action.",
+            )
+        return admin
+    return _checker
+
+
+async def get_current_super_admin(admin: dict = Depends(get_current_admin)) -> dict:
+    """Only a super admin (team management, etc.)."""
+    if admin.get("role") != "superadmin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin access required.",
+        )
+    return admin
+
+
+async def get_current_manager(admin: dict = Depends(get_current_admin)) -> dict:
+    """Super admin or admin — for financial/destructive actions (not support)."""
+    if admin.get("role") not in ("superadmin", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This action requires admin privileges.",
+        )
+    return admin
 
 
 # ============================================================================
@@ -115,29 +155,206 @@ class LoginResponse(BaseModel):
 # Auth Endpoints (No auth required)
 # ============================================================================
 @router.post("/login", response_model=LoginResponse)
-def admin_login(data: LoginRequest):
-    """Admin login endpoint."""
-    from utils.auth import create_access_token
+def admin_login(data: LoginRequest, session: Session = Depends(get_db_session)):
+    """Portal login. Checks the team table first (admin/support accounts a super
+    admin created), then falls back to the env-configured bootstrap super admin."""
+    from utils.auth import create_access_token, verify_password
+    from database import AdminUser
 
-    if not verify_admin_credentials(data.email, data.password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
-        )
+    email = (data.email or "").strip().lower()
 
-    token = create_access_token({
-        "sub": "admin",
-        "email": data.email,
-        "role": "admin",
-    })
+    # 1) A real team account (admin or support, or a promoted super admin).
+    member = session.execute(
+        select(AdminUser).where(func.lower(AdminUser.email) == email)
+    ).scalar_one_or_none()
+    if member is not None:
+        if not member.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="This account has been deactivated.")
+        if not verify_password(data.password or "", member.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                                detail="Invalid credentials")
+        token = create_access_token({
+            "sub": member.id, "admin_id": member.id,
+            "email": member.email, "role": member.role,
+        })
+        return {
+            "access_token": token,
+            "admin": {"id": member.id, "email": member.email,
+                      "name": member.name or "Admin", "role": member.role},
+        }
 
+    # 2) Bootstrap super admin from environment (the very first login).
+    if verify_admin_credentials(data.email, data.password):
+        token = create_access_token({
+            "sub": "superadmin", "admin_id": "superadmin",
+            "email": data.email, "role": "superadmin",
+        })
+        return {
+            "access_token": token,
+            "admin": {"id": "superadmin", "email": data.email,
+                      "name": "Super Admin", "role": "superadmin"},
+        }
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid credentials")
+
+
+# ============================================================================
+# Team management (super admin only) — create/list/manage admin & support logins
+# ============================================================================
+class TeamMemberCreate(BaseModel):
+    email: str
+    name: str
+    password: str
+    role: str  # "admin" | "support"
+
+
+class TeamMemberUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class PasswordReset(BaseModel):
+    password: str
+
+
+def _admin_to_dict(m) -> dict:
     return {
-        "access_token": token,
-        "admin": {
-            "id": "admin-001",
-            "email": data.email,
-            "name": "Admin",
-        },
+        "id": m.id,
+        "email": m.email,
+        "name": m.name,
+        "role": m.role,
+        "is_active": bool(m.is_active),
+        "created_at": m.created_at,
+    }
+
+
+@router.get("/team")
+def list_team(
+    admin: dict = Depends(get_current_super_admin),
+    session: Session = Depends(get_db_session),
+):
+    from database import AdminUser
+    rows = session.execute(
+        select(AdminUser).order_by(AdminUser.created_at.desc())
+    ).scalars().all()
+    return [_admin_to_dict(m) for m in rows]
+
+
+@router.post("/team", status_code=201)
+def create_team_member(
+    data: TeamMemberCreate,
+    admin: dict = Depends(get_current_super_admin),
+    session: Session = Depends(get_db_session),
+):
+    import uuid as _uuid
+    from utils.auth import hash_password
+    from database import AdminUser
+
+    if data.role not in ("admin", "support"):
+        raise HTTPException(status_code=400,
+                            detail="Role must be 'admin' or 'support'.")
+    email = (data.email or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="A valid email is required.")
+    if len(data.password or "") < 6:
+        raise HTTPException(status_code=400,
+                            detail="Password must be at least 6 characters.")
+    exists = session.execute(
+        select(AdminUser).where(func.lower(AdminUser.email) == email)
+    ).scalar_one_or_none()
+    if exists is not None:
+        raise HTTPException(status_code=400,
+                            detail="An account with this email already exists.")
+
+    member = AdminUser(
+        id=str(_uuid.uuid4()),
+        email=email,
+        name=(data.name or "").strip(),
+        password_hash=hash_password(data.password),
+        role=data.role,
+        is_active=True,
+        created_by=admin.get("admin_id"),
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    session.add(member)
+    session.commit()
+    session.refresh(member)
+    return _admin_to_dict(member)
+
+
+@router.patch("/team/{member_id}")
+def update_team_member(
+    member_id: str,
+    data: TeamMemberUpdate,
+    admin: dict = Depends(get_current_super_admin),
+    session: Session = Depends(get_db_session),
+):
+    from database import AdminUser
+    member = session.get(AdminUser, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+    if data.role is not None:
+        if data.role not in ("admin", "support"):
+            raise HTTPException(status_code=400,
+                                detail="Role must be 'admin' or 'support'.")
+        member.role = data.role
+    if data.name is not None:
+        member.name = data.name.strip()
+    if data.is_active is not None:
+        member.is_active = data.is_active
+    member.updated_at = datetime.utcnow()
+    session.commit()
+    session.refresh(member)
+    return _admin_to_dict(member)
+
+
+@router.post("/team/{member_id}/reset-password")
+def reset_team_password(
+    member_id: str,
+    data: PasswordReset,
+    admin: dict = Depends(get_current_super_admin),
+    session: Session = Depends(get_db_session),
+):
+    from utils.auth import hash_password
+    from database import AdminUser
+    member = session.get(AdminUser, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+    if len(data.password or "") < 6:
+        raise HTTPException(status_code=400,
+                            detail="Password must be at least 6 characters.")
+    member.password_hash = hash_password(data.password)
+    member.updated_at = datetime.utcnow()
+    session.commit()
+    return {"message": "Password updated."}
+
+
+@router.delete("/team/{member_id}")
+def delete_team_member(
+    member_id: str,
+    admin: dict = Depends(get_current_super_admin),
+    session: Session = Depends(get_db_session),
+):
+    from database import AdminUser
+    member = session.get(AdminUser, member_id)
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found.")
+    session.delete(member)
+    session.commit()
+    return {"message": "Member removed."}
+
+
+@router.get("/me")
+def admin_me(admin: dict = Depends(get_current_admin)):
+    """The current portal user's identity + role (drives UI permissions)."""
+    return {
+        "id": admin.get("admin_id") or admin.get("sub"),
+        "email": admin.get("email"),
+        "role": admin.get("role"),
     }
 
 
@@ -304,7 +521,7 @@ def update_user(
 @router.delete("/users/{user_id}")
 def delete_user(
     user_id: str,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session)
 ):
     """Delete user."""
@@ -733,7 +950,7 @@ def get_withdrawals(
 @router.post("/withdrawals/{withdrawal_id}/approve")
 def approve_withdrawal(
     withdrawal_id: str,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session)
 ):
     """Approve withdrawal."""
@@ -761,7 +978,7 @@ def approve_withdrawal(
 @router.post("/withdrawals/{withdrawal_id}/reject")
 def reject_withdrawal(
     withdrawal_id: str,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session)
 ):
     """Reject withdrawal."""
@@ -865,7 +1082,7 @@ def get_admin_settings(
 @router.put("/settings")
 def update_admin_settings(
     data: dict,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session)
 ):
     """Upsert one or more platform settings."""

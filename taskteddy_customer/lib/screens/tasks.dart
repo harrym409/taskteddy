@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../l10n/app_localizations.dart';
 import '../services/api_service.dart';
+import '../services/realtime_service.dart';
 import '../theme/theme.dart';
 import '../theme/category_icons.dart';
 import '../models/models.dart';
@@ -124,6 +126,9 @@ class _MyTasksState extends State<MyTasksScreen>
   bool _loading = true;
   bool _error = false;
 
+  StreamSubscription? _rtSub;
+  Timer? _pollTimer;
+
   @override
   void initState() {
     super.initState();
@@ -131,10 +136,34 @@ class _MyTasksState extends State<MyTasksScreen>
     _search = TextEditingController();
     _search.addListener(_onSearchChanged);
     _loadTasks();
+    // Live: a new bid on any of my tasks updates the offer counts instantly.
+    _rtSub = RealtimeService().events.listen((e) {
+      final t = e['type'];
+      if ((t == 'bid.new' || t == 'applications.changed') && mounted) {
+        _loadTasks(silent: true);
+      }
+    });
+    // Fallback poll (socket-down safety) — silent so the list doesn't flicker.
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) _loadTasks(silent: true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant MyTasksScreen old) {
+    super.didUpdateWidget(old);
+    // If this State is ever reused with a different number of sections, the
+    // TabController's length must match the tab count or the tabs break.
+    if (old.sections.length != widget.sections.length) {
+      _tab.dispose();
+      _tab = TabController(length: widget.sections.length, vsync: this);
+    }
   }
 
   @override
   void dispose() {
+    _rtSub?.cancel();
+    _pollTimer?.cancel();
     _search.removeListener(_onSearchChanged);
     _search.dispose();
     _tab.dispose();
@@ -146,11 +175,13 @@ class _MyTasksState extends State<MyTasksScreen>
     setState(() => _searchQuery = _search.text.trim());
   }
 
-  Future<void> _loadTasks() async {
-    setState(() {
-      _loading = true;
-      _error = false;
-    });
+  Future<void> _loadTasks({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = false;
+      });
+    }
     try {
       final tasks = await ApiService.getTasks(throwOnError: true);
       if (!mounted) return;
@@ -722,6 +753,17 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   // task's detail screen is open; the timer is cancelled in dispose.
   TaskerLocation? _taskerLocation;
   Timer? _locationTimer;
+  StreamSubscription? _rtSub;
+  Timer? _offersPoll;
+
+  // Billing/checkout summary (task amount, TaskTeddy bonus available/applied,
+  // net payable). Loaded once a tasker is assigned.
+  Map<String, dynamic>? _checkout;
+  bool _bonusBusy = false;
+  // Customer's TaskTeddy bonus balance + max discount %, cached for the
+  // "you'll save ₹X" preview shown before accepting an offer.
+  double _promoBalance = 0;
+  double _promoPct = 10;
 
   @override
   void initState() {
@@ -729,11 +771,27 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     _task = widget.task;
     _loadApplications();
     _maybeStartLocationPolling();
+    _loadCheckout();
+    _loadPromo();
+
+    final taskId = _task.remoteId ?? _task.id.toString();
+    // Live: a new bid on THIS task pushes an instant offers refresh.
+    _rtSub = RealtimeService().events.listen((e) {
+      if (e['type'] == 'bid.new' && '${e['task_id']}' == taskId && mounted) {
+        _loadApplications();
+      }
+    });
+    // Fallback poll while the task is still collecting offers (socket down safety).
+    _offersPoll = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (mounted && _task.status == TaskStatus.open) _loadApplications();
+    });
   }
 
   @override
   void dispose() {
     _locationTimer?.cancel();
+    _rtSub?.cancel();
+    _offersPoll?.cancel();
     super.dispose();
   }
 
@@ -784,6 +842,187 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       }
     }
     setState(() => _taskerLocation = loc);
+  }
+
+  Future<void> _loadCheckout() async {
+    if (_task.status != TaskStatus.assigned &&
+        _task.status != TaskStatus.inProgress) {
+      return;
+    }
+    final taskId = _task.remoteId ?? _task.id.toString();
+    final data = await ApiService.getTaskCheckout(taskId);
+    if (!mounted) return;
+    setState(() => _checkout = data);
+  }
+
+  Future<void> _loadPromo() async {
+    final promo = await ApiService.getPromoBalance();
+    if (!mounted || promo == null) return;
+    setState(() {
+      _promoBalance = (promo['promo_balance'] as num?)?.toDouble() ?? 0;
+      _promoPct = (promo['max_discount_pct'] as num?)?.toDouble() ?? 10;
+    });
+  }
+
+  /// Bonus (₹) that would apply to a bid of [amount] — capped at the discount
+  /// % of the bid and the customer's remaining balance. Preview only; the
+  /// backend re-computes and enforces the real cap when applied.
+  double _previewDiscount(double amount) {
+    final cap = (amount * _promoPct / 100);
+    final d = _promoBalance < cap ? _promoBalance : cap;
+    return d <= 0 ? 0 : double.parse(d.toStringAsFixed(2));
+  }
+
+  Future<void> _toggleBonus(bool apply) async {
+    if (_bonusBusy) return;
+    setState(() => _bonusBusy = true);
+    final taskId = _task.remoteId ?? _task.id.toString();
+    try {
+      final updated = await ApiService.applyTaskBonus(taskId, apply: apply);
+      if (!mounted) return;
+      setState(() => _checkout = updated);
+      _changed = true;
+      HapticFeedback.mediumImpact();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceAll('Exception: ', ''),
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w600)),
+          backgroundColor: C.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _bonusBusy = false);
+    }
+  }
+
+  Widget _buildBonusCard() {
+    final c = _checkout!;
+    double d(String k) => (c[k] as num?)?.toDouble() ?? 0.0;
+    final amount = d('amount');
+    final applied = d('promo_applied');
+    final available = d('promo_available_now');
+    final net = d('net_payable');
+    final canApply = c['can_apply'] == true;
+    final canRemove = c['can_remove'] == true;
+
+    String money(double v) => '₹${v.toStringAsFixed(0)}';
+
+    Widget row(String label, String value, {Color? color, bool bold = false}) =>
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: GoogleFonts.nunito(
+                      fontSize: 13.5,
+                      fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                      color: color ?? C.text2)),
+              Text(value,
+                  style: GoogleFonts.nunito(
+                      fontSize: bold ? 16 : 13.5,
+                      fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
+                      color: color ?? C.text1)),
+            ],
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: C.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.account_balance_wallet_outlined,
+                color: C.primary, size: 20),
+            const SizedBox(width: 8),
+            Text('Payment',
+                style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                    color: C.text1)),
+          ]),
+          const SizedBox(height: 12),
+          row('Task amount', money(amount)),
+          if (applied > 0)
+            row('TaskTeddy bonus', '− ${money(applied)}', color: C.green),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1),
+          ),
+          row('Pay tasker in cash', money(net), bold: true),
+          if (applied > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: C.green.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                const Icon(Icons.check_circle, color: C.green, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'You saved ${money(applied)} — pay the tasker only ${money(net)} in cash.',
+                    style: GoogleFonts.nunito(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: C.green),
+                  ),
+                ),
+              ]),
+            ),
+          ],
+          if (canApply) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _bonusBusy ? null : () => _toggleBonus(true),
+                icon: _bonusBusy
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.card_giftcard_rounded, size: 18),
+                label: Text('Use ${money(available)} TaskTeddy bonus',
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w800, fontSize: 14)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: C.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+          if (canRemove) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _bonusBusy ? null : () => _toggleBonus(false),
+                child: Text('Remove bonus',
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w700, color: C.text3)),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   /// Great-circle distance (km) between the task location and the tasker's
@@ -879,10 +1118,57 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
           ],
         ),
-        content: Text(
-          AppL10n.of(context)!
-              .taskAcceptOfferBody(app.applicant.name, app.bidAmount.toInt()),
-          style: GoogleFonts.nunito(fontSize: 14, color: C.text2, height: 1.5),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppL10n.of(context)!
+                  .taskAcceptOfferBody(app.applicant.name, app.bidAmount.toInt()),
+              style:
+                  GoogleFonts.nunito(fontSize: 14, color: C.text2, height: 1.5),
+            ),
+            if (_previewDiscount(app.bidAmount) > 0) ...[
+              const SizedBox(height: 14),
+              Builder(builder: (_) {
+                final saved = _previewDiscount(app.bidAmount);
+                final net = app.bidAmount - saved;
+                String m(double v) => '₹${v.toStringAsFixed(0)}';
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: C.green.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: C.green.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.card_giftcard_rounded,
+                          color: C.green, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Save ${m(saved)} with your TaskTeddy bonus',
+                                style: GoogleFonts.nunito(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    color: C.green)),
+                            Text('Pay only ${m(net)} in cash after accepting.',
+                                style: GoogleFonts.nunito(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: C.text3)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -923,6 +1209,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _loading = false;
       });
       _maybeStartLocationPolling();
+      _loadCheckout(); // surface the payment/bonus card now the task is assigned
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(AppL10n.of(context)!.taskOfferAccepted),
@@ -1446,6 +1733,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                   isLoading: _loading,
                   taskCompleted: task.status == TaskStatus.completed,
                 )),
+            ],
+
+            // Payment / TaskTeddy bonus checkout (assigned or in-progress).
+            if ((task.status == TaskStatus.inProgress ||
+                    task.status == TaskStatus.assigned) &&
+                _checkout != null) ...[
+              const SizedBox(height: 16),
+              _buildBonusCard(),
             ],
 
             // OTP

@@ -1,5 +1,7 @@
 import {
   Admin,
+  AdminRole,
+  TeamMember,
   AnalyticsCategory,
   AnalyticsPayouts,
   AnalyticsSummary,
@@ -53,9 +55,10 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 
 function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    // An expired/invalid/missing admin token: clear it and bounce to login.
-    // (Missing bearer headers surface as 403 from HTTPBearer.)
-    if ((res.status === 401 || res.status === 403) && typeof window !== "undefined") {
+    // Only an invalid/expired token (401) logs the user out. A 403 is a
+    // permission denial (RBAC) for a valid session — surface it as an error,
+    // don't bounce the user to login.
+    if (res.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("admin");
       if (window.location.pathname !== "/login") {
@@ -119,15 +122,82 @@ export async function adminLogout() {
 
 export async function getCurrentAdmin(): Promise<Admin | null> {
   if (typeof window === "undefined") return null;
-  
+
   const adminStr = localStorage.getItem("admin");
   if (!adminStr) return null;
-  
+
   try {
     return JSON.parse(adminStr);
   } catch {
     return null;
   }
+}
+
+/** Current portal role, read from the stored admin object. */
+export function getAdminRole(): AdminRole | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const a = localStorage.getItem("admin");
+    if (!a) return null;
+    return (JSON.parse(a).role as AdminRole) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ========== TEAM MANAGEMENT (super admin only) ==========
+
+export async function getTeam(): Promise<TeamMember[]> {
+  const res = await fetch(`${API_BASE}/api/admin/team`, {
+    headers: await getAuthHeaders(),
+  });
+  return handleResponse<TeamMember[]>(res);
+}
+
+export async function createTeamMember(body: {
+  email: string;
+  name: string;
+  password: string;
+  role: "admin" | "support";
+}): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/api/admin/team`, {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  return handleResponse<TeamMember>(res);
+}
+
+export async function updateTeamMember(
+  id: string,
+  body: { name?: string; role?: "admin" | "support"; is_active?: boolean }
+): Promise<TeamMember> {
+  const res = await fetch(`${API_BASE}/api/admin/team/${id}`, {
+    method: "PATCH",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  return handleResponse<TeamMember>(res);
+}
+
+export async function resetTeamPassword(
+  id: string,
+  password: string
+): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/team/${id}/reset-password`, {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify({ password }),
+  });
+  return handleResponse<{ message: string }>(res);
+}
+
+export async function deleteTeamMember(id: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/team/${id}`, {
+    method: "DELETE",
+    headers: await getAuthHeaders(),
+  });
+  return handleResponse<{ message: string }>(res);
 }
 
 // ========== DASHBOARD ==========

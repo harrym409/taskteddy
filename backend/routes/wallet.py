@@ -35,6 +35,34 @@ def get_balance(
     return {"balance": float(user.wallet_balance or 0.0)}
 
 
+@router.get("/promo")
+def get_promo_balance(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """The customer's non-withdrawable TaskTeddy bonus balance and its rules —
+    powers the rewards card and the checkout discount."""
+    from routes._helpers import PROMO_MAX_PCT, SIGNUP_BONUS
+    user = session.get(User, current_user["sub"])
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    email_verified = bool(user.email and user.email_verified_at)
+    granted = bool(getattr(user, "signup_bonus_granted", False))
+    is_customer = user.user_type == "customer"
+    # The welcome bonus is still to be claimed: a customer who hasn't been
+    # granted it yet unlocks it by verifying their email.
+    bonus_pending = is_customer and not granted
+    return {
+        "promo_balance": float(user.promo_balance or 0.0),
+        "max_discount_pct": PROMO_MAX_PCT,
+        "signup_bonus": SIGNUP_BONUS,
+        "email_verified": email_verified,
+        "name_set": bool((user.name or "").strip()),
+        "signup_bonus_granted": granted,
+        "bonus_pending": bonus_pending,
+    }
+
+
 @router.post("/topup", status_code=201)
 def top_up_wallet(
     data: WalletTopUpRequest,

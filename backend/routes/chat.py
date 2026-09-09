@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -13,10 +14,57 @@ from utils.uploads import save_upload_file
 
 router = APIRouter()
 
+# Anti-disintermediation guard: keep contact details out of chat so the two
+# parties can't take the deal off-platform. Blocks emails and phone-number-length
+# digit runs (the app only sends curated presets, so this never trips them).
+_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.\w+")
+
+
+def _contains_contact_info(text: str) -> bool:
+    if not text:
+        return False
+    if _EMAIL_RE.search(text):
+        return True
+    compact = re.sub(r"[\s\-\.\(\)]", "", text)
+    return re.search(r"\d{10,}", compact) is not None
+
+
+class LocationPayload(BaseModel):
+    lat: float
+    lng: float
+    label: str = Field(default="", max_length=60)
+    address: str = Field(default="", max_length=300)
+    landmark: str | None = Field(default=None, max_length=200)
+
 
 class MessagePayload(BaseModel):
     text: str = Field(default="")
     image_url: str | None = None
+    location: LocationPayload | None = None
+
+
+def _clean_location(loc: LocationPayload) -> dict:
+    """Validate a shared location and strip any smuggled contact info from its
+    free-text fields (address/label/landmark) so the pin stays on-platform."""
+    if not (-90.0 <= loc.lat <= 90.0 and -180.0 <= loc.lng <= 180.0):
+        raise HTTPException(status_code=400, detail="Invalid location coordinates.")
+    label = (loc.label or "").strip()[:60]
+    address = (loc.address or "").strip()[:300]
+    landmark = (loc.landmark or "").strip()[:200] if loc.landmark else ""
+    for part in (label, address, landmark):
+        if _contains_contact_info(part):
+            raise HTTPException(
+                status_code=400,
+                detail="For everyone's safety, contact details can't be shared "
+                       "in a location. Please keep coordination on TaskTeddy.",
+            )
+    return {
+        "lat": loc.lat,
+        "lng": loc.lng,
+        "label": label or "Location",
+        "address": address,
+        "landmark": landmark or None,
+    }
 
 
 def _ensure_chat_open(session: Session, conv: Conversation) -> None:
@@ -190,6 +238,7 @@ def get_messages(
             "sender_id": msg.sender_id,
             "text": msg.text or "",
             "image_url": msg.image_url,
+            "location": msg.location,
             "is_read": bool(msg.is_read),
             "created_at": msg.created_at,
         }
@@ -212,6 +261,14 @@ def send_message(
 
     now = datetime.utcnow()
     text = (data.text or "").strip()
+    if _contains_contact_info(text):
+        raise HTTPException(
+            status_code=400,
+            detail="For everyone's safety, sharing phone numbers or contact "
+                   "details in chat isn't allowed. Please keep coordination on TaskTeddy.",
+        )
+
+    location = _clean_location(data.location) if data.location else None
 
     message = Message(
         id=str(uuid.uuid4()),
@@ -220,20 +277,29 @@ def send_message(
         sender_type=current_user.get("role", "customer"),
         text=text,
         image_url=data.image_url,
+        location=location,
         is_read=False,
         created_at=now,
     )
     session.add(message)
 
-    conversation.last_message = (text[:100] if text else "Photo")
+    if location:
+        preview = "📍 Shared a location"
+    elif text:
+        preview = text[:100]
+    else:
+        preview = "Photo"
+    conversation.last_message = preview
     conversation.last_message_at = now
     # Notify the other participant of the new message.
     recipients = [p for p in (conversation.participants or []) if p != current_user["sub"]]
     sender = session.get(User, current_user["sub"])
     sender_name = sender.name if sender else "Someone"
+    notif_body = ("Shared a location" if location
+                  else (text[:120] if text else "Sent a photo"))
     for rid in recipients:
         notify_user(session, rid, f"Message from {sender_name}",
-                    text[:120] if text else "Sent a photo", emoji="💬")
+                    notif_body, emoji="💬")
     session.commit()
     session.refresh(message)
 
@@ -243,6 +309,7 @@ def send_message(
         "sender_id": message.sender_id,
         "text": message.text or "",
         "image_url": message.image_url,
+        "location": message.location,
         "is_read": bool(message.is_read),
         "created_at": message.created_at,
     }

@@ -9,6 +9,24 @@ class AppL10nEn extends AppL10n {
   AppL10nEn([String locale = 'en']) : super(locale);
 
   @override
+  String get walletDuesSettled => 'Dues settled — you can browse again.';
+
+  @override
+  String get browseDuesTitle => 'Browsing paused';
+
+  @override
+  String get browseDuesBody =>
+      'You have unsettled platform fees from cash jobs. Settle your wallet to continue browsing tasks.';
+
+  @override
+  String browseDuesAmount(String amount) {
+    return 'Dues: ₹$amount';
+  }
+
+  @override
+  String get browseSettleNow => 'Settle now';
+
+  @override
   String get appTagline => 'Find tasks & earn money on your schedule!';
 
   @override
@@ -1917,6 +1935,9 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get browseCoverLetter => 'Cover Letter *';
+
+  @override
+  String get browseCoverLetterOptional => 'Cover letter (optional)';
 
   @override
   String get browseCoverHint =>

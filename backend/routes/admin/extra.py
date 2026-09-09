@@ -19,7 +19,7 @@ from database import (
     Withdrawal,
     get_db_session,
 )
-from routes.admin.main import get_current_admin
+from routes.admin.main import get_current_admin, get_current_manager
 
 router = APIRouter()
 
@@ -77,7 +77,7 @@ class KycNumbers(BaseModel):
 def set_kyc_numbers(
     user_id: str,
     body: KycNumbers,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session),
 ):
     """Admin enters the tasker's Aadhaar / PAN number during verification.
@@ -170,6 +170,14 @@ def approve_task(
                 f"'{task.title}' passed review and is now live for taskers.",
                 emoji="✅")
     session.commit()
+    # Live push + region notifications: the task just went live.
+    try:
+        from realtime import notify_new_task
+        from routes._helpers import notify_taskers_of_new_task
+        notify_new_task()
+        notify_taskers_of_new_task(session, task)
+    except Exception:
+        pass
     return {"message": "Task approved", "status": task.status}
 
 
@@ -503,7 +511,7 @@ def complete_booking(
 @router.post("/users/{user_id}/suspend")
 def suspend_user(
     user_id: str,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session),
 ):
     user = session.get(User, user_id)
@@ -519,7 +527,7 @@ def suspend_user(
 @router.post("/users/{user_id}/unsuspend")
 def unsuspend_user(
     user_id: str,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session),
 ):
     user = session.get(User, user_id)
@@ -585,7 +593,7 @@ class AnnouncementCreate(BaseModel):
 @router.post("/announcements", status_code=201)
 def send_announcement(
     data: AnnouncementCreate,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(get_current_manager),
     session: Session = Depends(get_db_session),
 ):
     """Broadcast an in-app notification (and push, if FCM is configured) to

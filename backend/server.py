@@ -132,6 +132,10 @@ app.include_router(addresses.router, prefix="/api/addresses", tags=["addresses"]
 from routes import safety
 app.include_router(safety.router, prefix="/api/safety", tags=["safety"])
 
+# Real-time WebSocket layer (live task/bid updates at /ws).
+import realtime
+app.include_router(realtime.router)
+
 # Serve uploaded task images
 from utils.file_storage import UPLOAD_DIR
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

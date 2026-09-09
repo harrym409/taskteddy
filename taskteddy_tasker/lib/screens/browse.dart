@@ -11,6 +11,7 @@ import '../l10n/app_localizations.dart';
 import '../theme/category_icons.dart';
 import '../services/api_service.dart';
 import '../services/tasker_state.dart';
+import '../services/realtime_service.dart';
 import '../models/models.dart';
 import 'messages.dart';
 import 'verification.dart';
@@ -377,12 +378,20 @@ class _BrowseState extends State<BrowseTasksScreen> {
   bool _isLoading = true;
   String? _error;
 
+  // Cash-dues gate: paused from browsing until the wallet is settled.
+  bool _duesBlocked = false;
+  double _dues = 0;
+  bool _settling = false;
+
   // Track tasks the tasker has already applied to
   Set<String> _appliedTaskIds = {};
 
   // KYC gate: optimistic until checked (the 403 handler is the backstop). When
   // known-false we swap Apply for a "Get verified" prompt.
   bool _isVerified = true;
+
+  StreamSubscription? _rtSub;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -397,6 +406,17 @@ class _BrowseState extends State<BrowseTasksScreen> {
       _loadMyApplications();
       _loadVerification();
     });
+    // Live: refresh the feed the moment a task goes live or an offer resolves.
+    _rtSub = RealtimeService().events.listen((e) {
+      final t = e['type'];
+      if (t == 'task.new' || t == 'applications.changed') {
+        if (mounted) _loadTasks(silent: true);
+      }
+    });
+    // Fallback poll so updates still arrive if the socket is down (~15s).
+    _pollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted && !_duesBlocked) _loadTasks(silent: true);
+    });
   }
 
   Future<void> _loadVerification() async {
@@ -404,14 +424,30 @@ class _BrowseState extends State<BrowseTasksScreen> {
     if (mounted) setState(() => _isVerified = verified);
   }
 
-  Future<void> _loadTasks() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  Future<void> _loadTasks({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    }
     // Re-check verification on every (re)load so a freshly-verified tasker
     // stops seeing the "Get verified" prompt after a pull-to-refresh.
     _loadVerification();
+
+    // Cash-dues gate: if paused, show the settle screen instead of the feed.
+    final dues = await ApiService.getDuesStatus();
+    if (!mounted) return;
+    if (dues['blocked'] == true) {
+      setState(() {
+        _duesBlocked = true;
+        _dues = (dues['dues'] as num?)?.toDouble() ?? 0;
+        _isLoading = false;
+      });
+      return;
+    }
+    if (_duesBlocked) setState(() => _duesBlocked = false);
+
     try {
       final tasks = await ApiService.getTasks(status: 'open');
       if (mounted) {
@@ -428,6 +464,95 @@ class _BrowseState extends State<BrowseTasksScreen> {
         });
       }
     }
+  }
+
+  Future<void> _settleDues() async {
+    setState(() => _settling = true);
+    final err = await ApiService.settleDues();
+    if (!mounted) return;
+    setState(() => _settling = false);
+    if (err == null) {
+      TaskerState().loadWallet(); // refresh wallet balance/dues banner
+      _loadTasks(); // dues cleared → resume browsing
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(err), backgroundColor: T.red),
+      );
+    }
+  }
+
+  Widget _buildDuesPause() {
+    final l = AppL10n.of(context)!;
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: T.red.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.pause_circle_filled_rounded,
+                  size: 44, color: T.red),
+            ),
+            const SizedBox(height: 18),
+            Text(l.browseDuesTitle,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: T.text1)),
+            const SizedBox(height: 8),
+            Text(l.browseDuesBody,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.nunito(
+                    fontSize: 14, color: T.text3, height: 1.5)),
+            const SizedBox(height: 16),
+            if (_dues > 0)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                decoration: BoxDecoration(
+                    color: T.redLight,
+                    borderRadius: BorderRadius.circular(14)),
+                child: Text(l.browseDuesAmount(_dues.toStringAsFixed(0)),
+                    style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: T.red)),
+              ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _settling ? null : _settleDues,
+                icon: _settling
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.check_circle_outline, size: 18),
+                label: Text(l.browseSettleNow,
+                    style: GoogleFonts.nunito(
+                        fontSize: 15, fontWeight: FontWeight.w800)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: T.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _loadMyApplications() async {
@@ -1045,6 +1170,8 @@ class _BrowseState extends State<BrowseTasksScreen> {
 
   @override
   void dispose() {
+    _rtSub?.cancel();
+    _pollTimer?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -1060,7 +1187,9 @@ class _BrowseState extends State<BrowseTasksScreen> {
           _buildCatFilter(),
           _buildSortBar(),
           Expanded(
-            child: _isLoading
+            child: _duesBlocked
+                ? _buildDuesPause()
+                : _isLoading
                 ? const Center(child: CircularProgressIndicator(color: T.primary))
                 : _error != null
                     ? Center(
@@ -1882,7 +2011,8 @@ class _ApplyState extends State<ApplyScreen> {
 
   void _apply() async {
     final l = AppL10n.of(context)!;
-    if (_bidCtrl.text.isEmpty || _coverCtrl.text.isEmpty) {
+    // Only the bid amount is required; the cover letter is optional.
+    if (_bidCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -2249,7 +2379,7 @@ class _ApplyState extends State<ApplyScreen> {
 
             const SizedBox(height: 18),
 
-            _SecLabel(l.browseCoverLetter),
+            _SecLabel(l.browseCoverLetterOptional),
             const SizedBox(height: 8),
             TextField(
               controller: _coverCtrl,

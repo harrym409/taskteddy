@@ -29,6 +29,9 @@ from utils.geolocation import DEFAULT_RADIUS_KM, MAX_RADIUS_KM, haversine_distan
 
 router = APIRouter(tags=["tasker"])
 
+# How many unsettled cash jobs a tasker may carry before browsing is paused.
+CASH_DUES_LIMIT = 2
+
 
 def _require_tasker(user_id: str) -> None:
     """Ensure user is a tasker"""
@@ -337,6 +340,58 @@ def get_location(
 # Browse Tasks (for Taskers to find work)
 # ============================================================================
 
+@router.get("/dues-status")
+def dues_status(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Whether the tasker is paused from browsing over unsettled cash dues."""
+    _require_tasker(current_user["sub"])
+    tasker = session.get(User, current_user["sub"])
+    pending = int(tasker.pending_cash_jobs or 0) if tasker else 0
+    balance = float(tasker.wallet_balance or 0.0) if tasker else 0.0
+    dues = round(-balance, 2) if balance < 0 else 0.0
+    return {
+        "blocked": pending >= CASH_DUES_LIMIT,
+        "pending_cash_jobs": pending,
+        "limit": CASH_DUES_LIMIT,
+        "dues": dues,
+    }
+
+
+@router.post("/settle-dues")
+def settle_dues(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Settle the platform commission the tasker collected in cash. Clears the
+    negative balance and resets the unsettled-cash counter, unpausing browsing.
+    (No payment gateway at this stage — settlement is recorded directly.)"""
+    import uuid as _uuid
+    from database import Transaction
+    _require_tasker(current_user["sub"])
+    tasker = session.get(User, current_user["sub"])
+    if tasker is None:
+        raise HTTPException(status_code=404, detail="Tasker not found")
+
+    balance = float(tasker.wallet_balance or 0.0)
+    dues = round(-balance, 2) if balance < 0 else 0.0
+    if dues > 0:
+        session.add(Transaction(
+            id=str(_uuid.uuid4()),
+            user_id=tasker.id,
+            type="settlement",
+            amount=dues,
+            description=f"Settled platform dues (₹{dues:.0f})",
+            created_at=datetime.utcnow(),
+        ))
+        tasker.wallet_balance = 0.0
+    tasker.pending_cash_jobs = 0
+    tasker.updated_at = datetime.utcnow()
+    session.commit()
+    return {"message": "Dues settled", "settled": dues, "balance": float(tasker.wallet_balance)}
+
+
 @router.get("/tasks")
 def browse_tasks(
     category: str | None = None,
@@ -360,6 +415,27 @@ def browse_tasks(
     not geotagged, and hiding them would leave taskers with an empty feed.
     """
     _require_tasker(current_user["sub"])
+
+    # Cash-dues gate: a tasker who has piled up unsettled cash jobs is paused
+    # from browsing until they settle their wallet.
+    _tasker = session.get(User, current_user["sub"])
+    if _tasker and int(_tasker.pending_cash_jobs or 0) >= CASH_DUES_LIMIT:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Settle your platform dues to continue browsing tasks.",
+        )
+
+    # Remember the tasker's region so new-task notifications can target them.
+    if (
+        _tasker is not None
+        and latitude is not None
+        and longitude is not None
+        and (_tasker.latitude != latitude or _tasker.longitude != longitude)
+    ):
+        _tasker.latitude = latitude
+        _tasker.longitude = longitude
+        _tasker.last_location_at = datetime.utcnow()
+        session.commit()
 
     # Release any tasks that have cleared the review-hold window before listing.
     from routes._helpers import release_pending_tasks
@@ -762,8 +838,11 @@ def complete_task(
     ).scalar_one_or_none()
     gross = float(accepted.bid_amount) if accepted else float(task.budget or 0)
 
+    promo = float(task.promo_discount or 0.0)
     if payment_method == "wallet":
-        # Funds held by the platform: release net to the tasker's wallet.
+        # Funds held by the platform: release net to the tasker's wallet. Any
+        # customer bonus was already deducted at apply time and simply reduces
+        # the platform's kept commission — the tasker's net is unchanged.
         earning = credit_earning(
             session, current_user["sub"], gross,
             f"Earning for '{task.title}'", task_id=task.id,
@@ -771,14 +850,22 @@ def complete_task(
         notify_user(session, current_user["sub"], "Payment Received",
                     f"₹{earning['net']:.0f} credited to your wallet for '{task.title}'.")
     else:
-        # Cash job: tasker collected cash; record the commission they owe.
+        # Cash job: tasker collected cash; record the commission they owe. A
+        # customer bonus reduces both the cash they collect and the fee they owe
+        # by the same amount, so their take-home is unchanged.
         earning = charge_commission(
             session, current_user["sub"], gross,
-            f"'{task.title}'", task_id=task.id,
+            f"'{task.title}'", task_id=task.id, discount=promo,
         )
+        collected = earning.get("collected", earning["gross"])
         notify_user(session, current_user["sub"], "Job Completed",
-                    f"You collected ₹{earning['gross']:.0f} in cash. "
+                    f"You collected ₹{collected:.0f} in cash. "
                     f"Platform fee ₹{earning['commission']:.0f} was deducted from your wallet.")
+
+    if promo > 0:
+        notify_user(session, task.posted_by, "Bonus Applied",
+                    f"Your ₹{promo:.0f} TaskTeddy bonus saved you money on '{task.title}'. "
+                    f"Thanks for using TaskTeddy!", emoji="🎁")
 
     notify_user(session, task.posted_by, "Task Completed",
                 f"'{task.title}' has been completed. Don't forget to leave a review!",
@@ -874,6 +961,26 @@ def tasker_cancel_task(
     task.cancelled_by = current_user["sub"]
     task.applicants_count = len(others)
     task.updated_at = now
+
+    # Refund any bonus the customer had locked onto this task — the tasker/bid it
+    # was tied to is gone, so the customer can re-apply it after choosing again.
+    refund = round(float(task.promo_discount or 0.0), 2)
+    if refund > 0:
+        import uuid as _uuid
+        from database import Transaction
+        _cust = session.get(User, former_customer)
+        if _cust:
+            _cust.promo_balance = round(float(_cust.promo_balance or 0.0) + refund, 2)
+        task.promo_discount = 0.0
+        session.add(Transaction(
+            id=str(_uuid.uuid4()),
+            user_id=former_customer,
+            type="promo",
+            amount=refund,
+            description=f"TaskTeddy bonus refunded — tasker left '{task.title}'",
+            task_id=task.id,
+            created_at=now,
+        ))
 
     tasker = session.get(User, current_user["sub"])
     if tasker:

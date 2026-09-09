@@ -1,4 +1,9 @@
 {
+  "walletDuesSettled": "बकाया चुकता — अब आप फिर से ब्राउज़ कर सकते हैं।",
+  "browseDuesTitle": "ब्राउज़िंग रुकी हुई है",
+  "browseDuesBody": "नकद कामों से आपके प्लेटफ़ॉर्म शुल्क बकाया हैं। कार्य ब्राउज़ करना जारी रखने के लिए अपना वॉलेट सेटल करें।",
+  "browseDuesAmount": "बकाया: ₹{amount}",
+  "browseSettleNow": "अभी सेटल करें",
   "@@locale": "hi",
   "appTagline": "अपने समय के अनुसार काम पाएँ और पैसे कमाएँ!",
   "navHome": "होम",
@@ -573,6 +578,7 @@
   "browseEstTakeHome": "अनुमानित शुद्ध राशि",
   "browseAfterFee": "10% प्लेटफ़ॉर्म शुल्क के बाद",
   "browseCoverLetter": "कवर लेटर *",
+  "browseCoverLetterOptional": "कवर लेटर (वैकल्पिक)",
   "browseCoverHint": "अपना परिचय दें। आप सबसे उपयुक्त क्यों हैं? अपना अनुभव और उपलब्धता बताएँ...",
   "browseCoverTip": "अच्छे कवर लेटर चयन की संभावना 70% बढ़ाते हैं",
   "browseFeeNote": "TaskTeddy केवल कार्य पूरा होने पर 10% प्लेटफ़ॉर्म शुल्क लेता है।",

@@ -9,6 +9,25 @@ class AppL10nPa extends AppL10n {
   AppL10nPa([String locale = 'pa']) : super(locale);
 
   @override
+  String get walletDuesSettled =>
+      'ਬਕਾਇਆ ਸੈਟਲ — ਹੁਣ ਤੁਸੀਂ ਫਿਰ ਬ੍ਰਾਊਜ਼ ਕਰ ਸਕਦੇ ਹੋ।';
+
+  @override
+  String get browseDuesTitle => 'ਬ੍ਰਾਊਜ਼ਿੰਗ ਰੁਕੀ ਹੋਈ ਹੈ';
+
+  @override
+  String get browseDuesBody =>
+      'ਨਕਦ ਕੰਮਾਂ ਤੋਂ ਤੁਹਾਡੀਆਂ ਪਲੇਟਫਾਰਮ ਫੀਸਾਂ ਬਕਾਇਆ ਹਨ। ਕੰਮ ਬ੍ਰਾਊਜ਼ ਕਰਨਾ ਜਾਰੀ ਰੱਖਣ ਲਈ ਆਪਣਾ ਵਾਲਿਟ ਸੈਟਲ ਕਰੋ।';
+
+  @override
+  String browseDuesAmount(String amount) {
+    return 'ਬਕਾਇਆ: ₹$amount';
+  }
+
+  @override
+  String get browseSettleNow => 'ਹੁਣੇ ਸੈਟਲ ਕਰੋ';
+
+  @override
   String get appTagline => 'ਆਪਣੇ ਸਮੇਂ ਅਨੁਸਾਰ ਕੰਮ ਲੱਭੋ ਅਤੇ ਪੈਸੇ ਕਮਾਓ!';
 
   @override
@@ -1921,6 +1940,9 @@ class AppL10nPa extends AppL10n {
 
   @override
   String get browseCoverLetter => 'ਕਵਰ ਲੈਟਰ *';
+
+  @override
+  String get browseCoverLetterOptional => 'ਕਵਰ ਲੈਟਰ (ਵਿਕਲਪਿਕ)';
 
   @override
   String get browseCoverHint =>

@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { adminLogout, getQueueCounts } from "@/lib/api";
-import { QueueCounts } from "@/types";
+import { adminLogout, getQueueCounts, getAdminRole } from "@/lib/api";
+import { QueueCounts, AdminRole } from "@/types";
 import {
   LayoutDashboard,
   LineChart,
@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   LifeBuoy,
+  UserCog,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -37,6 +38,8 @@ interface SidebarItem {
   label: string;
   icon: typeof LayoutDashboard;
   badge?: { key: keyof QueueCounts; tone: BadgeTone };
+  // Which roles may see this item. Omitted = visible to every role.
+  roles?: AdminRole[];
 }
 
 interface SidebarSection {
@@ -44,19 +47,21 @@ interface SidebarSection {
   items: SidebarItem[];
 }
 
+const MANAGER: AdminRole[] = ["superadmin", "admin"];
+
 const sidebarSections: SidebarSection[] = [
   {
     label: "Overview",
     items: [
       { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/analytics", label: "Analytics", icon: LineChart },
+      { href: "/analytics", label: "Analytics", icon: LineChart, roles: MANAGER },
     ],
   },
   {
     label: "Management",
     items: [
       { href: "/users", label: "Users", icon: Users },
-      { href: "/verifications", label: "Verifications", icon: ShieldCheck },
+      { href: "/verifications", label: "Verifications", icon: ShieldCheck, roles: MANAGER },
       { href: "/tasks", label: "Tasks", icon: ListTodo },
       {
         href: "/review-queue",
@@ -64,8 +69,8 @@ const sidebarSections: SidebarSection[] = [
         icon: ClipboardCheck,
         badge: { key: "review_queue", tone: "amber" },
       },
-      { href: "/services", label: "Services", icon: Wrench },
-      { href: "/bookings", label: "Bookings", icon: CalendarCheck },
+      { href: "/services", label: "Services", icon: Wrench, roles: MANAGER },
+      { href: "/bookings", label: "Bookings", icon: CalendarCheck, roles: MANAGER },
       { href: "/disputes", label: "Disputes", icon: Gavel },
       {
         href: "/reports-safety",
@@ -83,24 +88,26 @@ const sidebarSections: SidebarSection[] = [
         label: "Wallet",
         icon: Wallet,
         badge: { key: "pending_withdrawals", tone: "slate" },
+        roles: MANAGER,
       },
-      { href: "/reports", label: "Financial report", icon: FileText },
+      { href: "/reports", label: "Financial report", icon: FileText, roles: MANAGER },
     ],
   },
   {
     label: "Platform",
     items: [
-      { href: "/announcements", label: "Announcements", icon: Megaphone },
+      { href: "/announcements", label: "Announcements", icon: Megaphone, roles: MANAGER },
       {
         href: "/support",
         label: "Support",
         icon: LifeBuoy,
         badge: { key: "open_tickets", tone: "slate" },
       },
-      { href: "/audit", label: "Audit log", icon: ScrollText },
+      { href: "/audit", label: "Audit log", icon: ScrollText, roles: MANAGER },
       { href: "/reviews", label: "Reviews", icon: Star },
-      { href: "/settings", label: "Settings", icon: Settings },
-      { href: "/system", label: "System", icon: Activity },
+      { href: "/team", label: "Team", icon: UserCog, roles: ["superadmin"] },
+      { href: "/settings", label: "Settings", icon: Settings, roles: MANAGER },
+      { href: "/system", label: "System", icon: Activity, roles: MANAGER },
     ],
   },
 ];
@@ -148,6 +155,20 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [counts, setCounts] = useState<QueueCounts | null>(null);
+  const [role, setRole] = useState<AdminRole | null>(null);
+
+  // Read the signed-in role once mounted (localStorage is client-only).
+  useEffect(() => setRole(getAdminRole()), []);
+
+  // Hide items the current role isn't allowed to see; drop empty sections.
+  const visibleSections = sidebarSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter(
+        (item) => !item.roles || (role != null && item.roles.includes(role))
+      ),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // Live queue counts: fetch on mount, then poll every 30s. Failures are
   // swallowed so a transient/network error never breaks the shell chrome.
@@ -225,7 +246,7 @@ export function Sidebar({
           collapsed ? "space-y-2 px-2" : "space-y-6 px-3"
         )}
       >
-        {sidebarSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label}>
             {!collapsed && (
               <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
