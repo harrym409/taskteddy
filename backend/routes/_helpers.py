@@ -569,3 +569,9 @@ def notify_user(session, user_id: str, title: str, body: str, emoji: str = "💰
         is_read=False,
         created_at=_dt.utcnow(),
     ))
+    # Push it live so the app can show a transient heads-up banner. Best-effort.
+    try:
+        from realtime import notify_alert
+        notify_alert(user_id, title, body, emoji, notif_type, related_id)
+    except Exception:
+        pass

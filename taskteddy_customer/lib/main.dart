@@ -13,6 +13,7 @@ import 'screens/other.dart';
 import 'screens/profile.dart';
 import 'state/app_provider_observer.dart';
 import 'theme/theme.dart';
+import 'widgets/alert_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +44,9 @@ class App extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         title: 'TaskTeddy',
         theme: buildCustomerTheme(),
+        navigatorKey: appNavigatorKey,
+        builder: (context, child) =>
+            AlertBannerHost(child: child ?? const SizedBox.shrink()),
         locale: ref.watch(localeProvider),
         localizationsDelegates: AppL10n.localizationsDelegates,
         supportedLocales: AppL10n.supportedLocales,

@@ -138,3 +138,19 @@ def notify_new_bid(poster_id: str, task_id: str) -> None:
 
 def notify_applications_changed(user_id: str) -> None:
     manager.send_to_user(user_id, {"type": "applications.changed"})
+
+
+def notify_alert(user_id: str, title: str, body: str, emoji: str,
+                 notif_type: str, related_id: str | None) -> None:
+    """Push a just-created in-app notification to the user's live socket so the
+    app can show a transient heads-up banner (and deep-link on tap)."""
+    manager.send_to_user(user_id, {
+        "type": "alert",
+        "alert": {
+            "title": title,
+            "body": body,
+            "emoji": emoji or "",
+            "notif_type": notif_type,
+            "related_id": related_id or "",
+        },
+    })

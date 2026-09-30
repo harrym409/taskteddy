@@ -7,6 +7,7 @@ import 'screens/splash.dart';
 import 'screens/messages.dart';
 import 'screens/login_otp.dart';
 import 'screens/shell.dart';
+import 'widgets/alert_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,9 @@ class TaskerApp extends StatelessWidget {
           title: 'TaskTeddy Tasker',
           debugShowCheckedModeBanner: false,
           theme: buildTaskerTheme(),
+          navigatorKey: appNavigatorKey,
+          builder: (context, child) =>
+              AlertBannerHost(child: child ?? const SizedBox.shrink()),
           locale: localeController.locale,
           localizationsDelegates: AppL10n.localizationsDelegates,
           supportedLocales: AppL10n.supportedLocales,
