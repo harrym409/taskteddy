@@ -649,6 +649,64 @@ def send_announcement(
     }
 
 
+class AdminNotifyCreate(BaseModel):
+    title: str
+    body: str
+    # Deep-link type the app routes on when the alert is tapped:
+    # verify_email | bonus | task | chat | announcement | general
+    type: str = "announcement"
+    related_id: str | None = None
+    emoji: str | None = None
+    user_id: str | None = None            # target one user…
+    audience: str = "all"                 # …or an audience: all|customers|taskers
+
+
+_NOTIFY_EMOJI = {
+    "verify_email": "✉️",
+    "bonus": "🎁",
+    "task": "📋",
+    "chat": "💬",
+    "announcement": "📢",
+}
+
+
+@router.post("/notify", status_code=201)
+def admin_notify(
+    data: AdminNotifyCreate,
+    admin: dict = Depends(get_current_manager),
+    session: Session = Depends(get_db_session),
+):
+    """Send a typed in-app notification to one user or an audience. The ``type``
+    (and ``related_id``) let the app deep-link when the alert is tapped — e.g.
+    type="verify_email" opens the email-verification flow."""
+    from routes._helpers import notify_user
+
+    emoji = data.emoji or _NOTIFY_EMOJI.get(data.type, "🔔")
+
+    if data.user_id:
+        target = session.get(User, data.user_id)
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found")
+        users = [target]
+    else:
+        query = select(User).where(User.is_suspended.is_(False))
+        if data.audience == "customers":
+            query = query.where(User.user_type == "customer")
+        elif data.audience == "taskers":
+            query = query.where(User.user_type == "tasker")
+        users = session.execute(query).scalars().all()
+
+    for u in users:
+        notify_user(session, u.id, data.title.strip(), data.body.strip(),
+                    emoji=emoji, notif_type=data.type,
+                    related_id=data.related_id)
+    audit(session, admin, "notify.send", "notification", data.user_id,
+          f"{data.type}: {data.title.strip()[:60]}")
+    session.commit()
+    return {"message": "Notification sent", "recipients": len(users),
+            "type": data.type}
+
+
 # ============================================================================
 # Service create / delete
 # ============================================================================

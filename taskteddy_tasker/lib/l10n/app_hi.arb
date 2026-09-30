@@ -600,7 +600,7 @@
   "browseCancelling": "रद्द किया जा रहा है...",
   "browseCancelJob": "कार्य रद्द करें",
   "browseEnterCompletionOtp": "पूर्णता OTP दर्ज करें",
-  "browseOtpPrompt": "कार्य पूर्णता की पुष्टि और भुगतान प्राप्त करने के लिए ग्राहक से 4-अंकों का OTP माँगें।",
+  "browseOtpPrompt": "कार्य पूर्ण करने और भुगतान पाने के लिए ग्राहक की स्क्रीन पर दिख रहा OTP माँगें।",
   "browseVerifyComplete": "सत्यापित करें और कार्य पूरा करें",
   "browseReasonEmergency": "आपात स्थिति",
   "browseReasonTooFar": "बहुत दूर",

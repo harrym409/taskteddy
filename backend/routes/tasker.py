@@ -869,7 +869,7 @@ def complete_task(
 
     notify_user(session, task.posted_by, "Task Completed",
                 f"'{task.title}' has been completed. Don't forget to leave a review!",
-                emoji="✅")
+                emoji="✅", notif_type="task", related_id=task.id)
     session.commit()
 
     return {"message": "Task completed successfully", "earning": earning}
@@ -894,7 +894,8 @@ def mark_on_the_way(
     task.updated_at = datetime.utcnow()
     from routes._helpers import notify_user
     notify_user(session, task.posted_by, "Tasker on the way",
-                f"Your tasker is heading to '{task.title}'.", emoji="🚗")
+                f"Your tasker is heading to '{task.title}'.", emoji="🚗",
+                notif_type="task", related_id=task.id)
     session.commit()
     return {"message": "Marked on the way", "on_the_way_at": task.on_the_way_at}
 

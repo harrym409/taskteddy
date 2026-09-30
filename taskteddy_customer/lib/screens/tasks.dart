@@ -1772,28 +1772,40 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                             color: C.text3,
                             fontWeight: FontWeight.w500)),
                     const SizedBox(height: 12),
-                    Row(
+                    // Responsive OTP boxes — size to fit any length (4–6 digits)
+                    // within the available width so they never overflow.
+                    LayoutBuilder(builder: (context, constraints) {
+                      final digits = task.completionOtp!.split('');
+                      const gap = 8.0;
+                      final maxW = constraints.maxWidth;
+                      final boxW = ((maxW - gap * (digits.length - 1)) /
+                              digits.length)
+                          .clamp(0.0, 54.0);
+                      final boxH = boxW * 1.12;
+                      return Row(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: task.completionOtp!
-                            .split('')
-                            .map((d) => Container(
-                                  width: 54,
-                                  height: 62,
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 4),
-                                  decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color: C.yellow, width: 2)),
-                                  child: Center(
-                                      child: Text(d,
-                                          style: GoogleFonts.nunito(
-                                              fontSize: 28,
-                                              fontWeight: FontWeight.w900,
-                                              color: C.yellow))),
-                                ))
-                            .toList()),
+                        children: [
+                          for (int i = 0; i < digits.length; i++) ...[
+                            if (i > 0) const SizedBox(width: gap),
+                            Container(
+                              width: boxW,
+                              height: boxH,
+                              decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border:
+                                      Border.all(color: C.yellow, width: 2)),
+                              child: Center(
+                                  child: Text(digits[i],
+                                      style: GoogleFonts.nunito(
+                                          fontSize: boxW * 0.5,
+                                          fontWeight: FontWeight.w900,
+                                          color: C.yellow))),
+                            ),
+                          ],
+                        ],
+                      );
+                    }),
                   ])),
             ],
 
@@ -2944,6 +2956,9 @@ class _PostTaskState extends State<PostTaskScreen> {
   final _budget = TextEditingController();
   final List<XFile> _taskImages = [];
   late TaskCategory _cat = widget.initialCategory ?? TaskCategory.other;
+  // Category picker expands inline to reveal the grid; starts open only when
+  // nothing meaningful is chosen yet.
+  late bool _catExpanded = _cat == TaskCategory.other;
   DateTime _deadline = DateTime.now().add(const Duration(days: 3));
   // Canonical English priority sent to the backend: Standard | Priority | Urgent.
   String _priority = 'Standard';
@@ -2990,6 +3005,155 @@ class _PostTaskState extends State<PostTaskScreen> {
       );
 
   double get _enteredBudget => double.tryParse(_budget.text.trim()) ?? 0;
+
+  /// Inline expanding category selector: a styled header that shows the picked
+  /// category (icon + name), and an animated grid that expands below it.
+  Widget _buildCategorySelector(AppL10n l) {
+    final hasPick = _cat != TaskCategory.other;
+    final catColor = hasPick ? categoryColor(_cat.name) : C.primary;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header — tap to expand/collapse.
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () {
+            FocusScope.of(context).unfocus();
+            setState(() => _catExpanded = !_catExpanded);
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _catExpanded ? catColor.withValues(alpha: 0.08)
+                                  : Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: (_catExpanded || hasPick) ? catColor : C.border,
+                width: (_catExpanded || hasPick) ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: catColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(categoryIcon(_cat.name),
+                      color: catColor, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        hasPick ? _cat.label : 'Choose a category',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: hasPick ? C.text1 : C.text2,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        hasPick ? 'Tap to change' : 'What do you need done?',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: C.text3,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                AnimatedRotation(
+                  turns: _catExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded,
+                      color: C.text3),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Grid — animates open/closed.
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.82,
+              children: TaskCategory.values.map((cat) {
+                final selected = _cat == cat;
+                final col = categoryColor(cat.name);
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    _cat = cat;
+                    _catExpanded = false; // collapse to show the pick
+                  }),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? col.withValues(alpha: 0.10)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: selected ? col : C.border,
+                          width: selected ? 1.5 : 1),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: col.withValues(alpha: 0.14),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(categoryIcon(cat.name),
+                              size: 22, color: col),
+                        ),
+                        const SizedBox(height: 8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            cat.label,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? col : C.text2,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          crossFadeState: _catExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
+        ),
+      ],
+    );
+  }
 
   Future<void> _hydrateLocationFromHomeCache() async {
     final prefs = await SharedPreferences.getInstance();
@@ -3369,36 +3533,7 @@ class _PostTaskState extends State<PostTaskScreen> {
                       const SizedBox(height: 4),
                       _SH(l.taskCategoryLabel),
                       const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: TaskCategory.values.map((cat) {
-                          final selected = _cat == cat;
-                          return ChoiceChip(
-                            selected: selected,
-                            onSelected: (_) => setState(() => _cat = cat),
-                            label: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(categoryIcon(cat.name),
-                                    size: 16,
-                                    color: selected ? C.primary : C.text3),
-                                const SizedBox(width: 6),
-                                Text(cat.label,
-                                    style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600,
-                                        color: selected ? C.primary : C.text2)),
-                              ],
-                            ),
-                            backgroundColor: Colors.white,
-                            selectedColor: C.primaryLight,
-                            side: BorderSide(
-                                color: selected ? C.primary : C.border),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          );
-                        }).toList(),
-                      ),
+                      _buildCategorySelector(l),
                       const SizedBox(height: 14),
                       _SH(l.taskUrgencyLabel),
                       const SizedBox(height: 10),

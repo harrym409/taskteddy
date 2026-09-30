@@ -341,11 +341,17 @@ class ApiService {
   static Future<List<TaskModel>> getTasks({
     String? status,
     String? category,
+    double? radiusKm,
   }) async {
     try {
       final params = <String, String>{};
       if (status != null) params['status'] = status;
       if (category != null) params['category'] = category;
+      // Search radius (km). Clamped 5–50 to match the app's slider and the
+      // backend's 50 km hard cap.
+      if (radiusKm != null) {
+        params['radius_km'] = radiusKm.clamp(5, 50).toStringAsFixed(0);
+      }
 
       // Attach the tasker's last known location so the backend limits the feed
       // to nearby tasks (default 40km, nearest-first) and keeps un-geotagged

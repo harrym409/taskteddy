@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -341,6 +342,8 @@ class _BrowseState extends State<BrowseTasksScreen> {
   double? _budgetMin;
   double? _budgetMax;
   String _budgetPreset = 'all';
+  // Search radius in km (5–50). The backend hard-caps the feed at 50 km.
+  double _radiusKm = 40;
 
   // Bookmarks — persisted across sessions; `_savedOnly` filters the feed to them.
   final Set<String> _savedTaskIds = {};
@@ -400,6 +403,7 @@ class _BrowseState extends State<BrowseTasksScreen> {
     // and initState runs while the shell's IndexedStack builds every tab — a
     // synchronous setState there throws "setState called during build".
     _loadSavedTasks();
+    _loadRadiusPref();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _loadTasks();
@@ -449,7 +453,8 @@ class _BrowseState extends State<BrowseTasksScreen> {
     if (_duesBlocked) setState(() => _duesBlocked = false);
 
     try {
-      final tasks = await ApiService.getTasks(status: 'open');
+      final tasks =
+          await ApiService.getTasks(status: 'open', radiusKm: _radiusKm);
       if (mounted) {
         setState(() {
           _allTasks = tasks;
@@ -646,6 +651,50 @@ class _BrowseState extends State<BrowseTasksScreen> {
     return list;
   }
 
+  static bool _looksLikePlusCode(String s) =>
+      RegExp(r'^[A-Z0-9]{2,}\+[A-Z0-9]{2,}').hasMatch(s.trim());
+
+  /// Build a street-level label ("street, area, city, state") from a reverse
+  /// geocode, de-duplicated and skipping blanks/Plus Codes.
+  String? _labelFromPlacemarks(List<Placemark> places) {
+    if (places.isEmpty) return null;
+    final p = places.first;
+    final street = [p.subThoroughfare, p.thoroughfare]
+        .whereType<String>()
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .join(' ')
+        .trim();
+    String head = street;
+    final name = (p.name ?? '').trim();
+    if (head.isEmpty &&
+        name.isNotEmpty &&
+        name != p.thoroughfare &&
+        !_looksLikePlusCode(name)) {
+      head = name;
+    }
+    final area = (p.subLocality ?? '').trim();
+    final city = (p.locality ?? p.subAdministrativeArea ?? '').trim();
+    final state = (p.administrativeArea ?? '').trim();
+    final country = (p.country ?? '').trim();
+
+    final parts = <String>[];
+    void add(String v) {
+      final t = v.trim();
+      if (t.isNotEmpty &&
+          !parts.any((x) => x.toLowerCase() == t.toLowerCase())) {
+        parts.add(t);
+      }
+    }
+
+    add(head);
+    add(area);
+    add(city);
+    add(state.isNotEmpty ? state : country);
+    if (parts.isEmpty) return null;
+    return parts.take(4).join(', ');
+  }
+
   void _showLocationPicker() {
     final l = AppL10n.of(context)!;
     showModalBottomSheet(
@@ -665,46 +714,78 @@ class _BrowseState extends State<BrowseTasksScreen> {
                 detecting = true;
                 loadingText = l.browseGpsPinging;
               });
-              await Future.delayed(const Duration(milliseconds: 600));
-              if (!ctx.mounted) return;
-              setSheetState(() {
-                loadingText = l.browseGpsResolving;
-              });
-              await Future.delayed(const Duration(milliseconds: 600));
-              if (!ctx.mounted) return;
-              setSheetState(() {
-                loadingText = l.browseGpsFetching;
-              });
-              await Future.delayed(const Duration(milliseconds: 500));
-              if (!ctx.mounted) return;
+              try {
+                if (!await Geolocator.isLocationServiceEnabled()) {
+                  throw Exception('gps-off');
+                }
+                var perm = await Geolocator.checkPermission();
+                if (perm == LocationPermission.denied) {
+                  perm = await Geolocator.requestPermission();
+                }
+                if (perm == LocationPermission.denied ||
+                    perm == LocationPermission.deniedForever) {
+                  throw Exception('perm');
+                }
+                if (ctx.mounted) {
+                  setSheetState(() => loadingText = l.browseGpsResolving);
+                }
+                final pos = await Geolocator.getCurrentPosition(
+                  locationSettings: const LocationSettings(
+                      accuracy: LocationAccuracy.high),
+                ).timeout(const Duration(seconds: 12));
+                if (ctx.mounted) {
+                  setSheetState(() => loadingText = l.browseGpsFetching);
+                }
+                final places = await placemarkFromCoordinates(
+                        pos.latitude, pos.longitude)
+                    .timeout(const Duration(seconds: 8));
+                final detected = _labelFromPlacemarks(places) ??
+                    '${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}';
 
-              final cities = ['Chandigarh', 'Delhi NCR', 'Amritsar', 'Jalandhar', 'Mumbai'];
-              cities.remove(_currentCity);
-              final detected = cities.first;
+                if (!mounted) return;
+                setState(() => _currentCity = detected);
 
-              setState(() {
-                _currentCity = detected;
-              });
-
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.gps_fixed,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              l.browseLocationDetected(detected),
+                              style: GoogleFonts.nunito(
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: T.green,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  );
+                }
+              } catch (_) {
+                if (!ctx.mounted) return;
+                setSheetState(() {
+                  detecting = false;
+                  loadingText = '';
+                });
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(
-                    content: Row(
-                      children: [
-                        const Icon(Icons.gps_fixed, color: Colors.white, size: 18),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            l.browseLocationDetected(detected),
-                            style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ],
+                    content: Text(
+                      'Could not detect location. Turn on GPS and allow location access.',
+                      style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
                     ),
-                    backgroundColor: T.green,
+                    backgroundColor: T.red,
                     behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 );
               }
@@ -907,6 +988,24 @@ class _BrowseState extends State<BrowseTasksScreen> {
     );
   }
 
+  Future<void> _loadRadiusPref() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final r = prefs.getDouble('browse_radius_km');
+      if (r != null && mounted) {
+        setState(() => _radiusKm = r.clamp(5, 50));
+        _loadTasks(silent: true); // reload with the saved radius
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistRadius() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('browse_radius_km', _radiusKm);
+    } catch (_) {}
+  }
+
   void _showFilterSheet() {
     final l = AppL10n.of(context)!;
     final minCtrl = TextEditingController(text: _budgetMin?.toInt().toString() ?? '');
@@ -914,6 +1013,7 @@ class _BrowseState extends State<BrowseTasksScreen> {
     String tempPreset = _budgetPreset;
     double? tempMin = _budgetMin;
     double? tempMax = _budgetMax;
+    double tempRadius = _radiusKm;
 
     showModalBottomSheet(
       context: context,
@@ -1009,6 +1109,7 @@ class _BrowseState extends State<BrowseTasksScreen> {
                               tempPreset = 'all';
                               tempMin = null;
                               tempMax = null;
+                              tempRadius = 40;
                               minCtrl.clear();
                               maxCtrl.clear();
                             });
@@ -1024,7 +1125,75 @@ class _BrowseState extends State<BrowseTasksScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
+                    // ── Distance / search radius ──
+                    Row(
+                      children: [
+                        const Icon(Icons.my_location_rounded,
+                            size: 18, color: T.primary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Search radius',
+                          style: GoogleFonts.nunito(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: T.text1,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: T.primaryLight,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${tempRadius.round()} km',
+                            style: GoogleFonts.nunito(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w900,
+                              color: T.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SliderTheme(
+                      data: SliderTheme.of(sheetCtx).copyWith(
+                        activeTrackColor: T.primary,
+                        inactiveTrackColor: T.primaryLight,
+                        thumbColor: T.primary,
+                        overlayColor: T.primary.withValues(alpha: 0.15),
+                        trackHeight: 4,
+                      ),
+                      child: Slider(
+                        value: tempRadius,
+                        min: 5,
+                        max: 50,
+                        divisions: 9,
+                        label: '${tempRadius.round()} km',
+                        onChanged: (v) => setSheet(() => tempRadius = v),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('5 km',
+                            style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: T.text3)),
+                        Text('50 km (max)',
+                            style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: T.text3)),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    const Divider(height: 1),
+                    const SizedBox(height: 16),
                     Text(
                       l.budgetRange,
                       style: GoogleFonts.nunito(
@@ -1141,12 +1310,19 @@ class _BrowseState extends State<BrowseTasksScreen> {
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: () {
+                          final radiusChanged = _radiusKm != tempRadius;
                           setState(() {
                             _budgetPreset = tempPreset;
                             _budgetMin = tempMin;
                             _budgetMax = tempMax;
+                            _radiusKm = tempRadius;
                           });
                           Navigator.pop(ctx);
+                          if (radiusChanged) {
+                            // Radius is server-side — re-fetch the feed with it.
+                            _persistRadius();
+                            _loadTasks();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1312,26 +1488,37 @@ class _BrowseState extends State<BrowseTasksScreen> {
                   const Spacer(),
                   GestureDetector(
                     onTap: _showLocationPicker,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.location_on, color: Colors.white70, size: 13),
-                          const SizedBox(width: 4),
-                          Text(
-                            _currentCity,
-                            style: GoogleFonts.nunito(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 190),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.location_on,
+                                color: Colors.white70, size: 13),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _currentCity,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.nunito(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                          ),
-                          const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 14),
-                        ],
+                            const Icon(Icons.keyboard_arrow_down,
+                                color: Colors.white, size: 14),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -3033,20 +3220,22 @@ class _ActiveTaskState extends State<ActiveTaskScreen> {
                     controller: _otpCtrl,
                     keyboardType: TextInputType.number,
                     textAlign: TextAlign.center,
-                    maxLength: 4,
+                    // Accept 4–6 digits so it matches whatever length the backend
+                    // issues (the customer screen shows the exact code to enter).
+                    maxLength: 6,
                     style: GoogleFonts.nunito(
-                      fontSize: 32,
+                      fontSize: 30,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 12,
+                      letterSpacing: 8,
                       color: T.primary,
                     ),
                     decoration: InputDecoration(
                       counterText: '',
-                      hintText: '• • • •',
+                      hintText: 'Enter code',
                       hintStyle: GoogleFonts.nunito(
-                        fontSize: 22,
+                        fontSize: 20,
                         color: T.text3,
-                        letterSpacing: 8,
+                        letterSpacing: 1,
                       ),
                       filled: true,
                       fillColor: Colors.white,

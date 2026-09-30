@@ -2018,7 +2018,7 @@ class AppL10nPa extends AppL10n {
 
   @override
   String get browseOtpPrompt =>
-      'ਕੰਮ ਪੂਰਤੀ ਦੀ ਪੁਸ਼ਟੀ ਅਤੇ ਭੁਗਤਾਨ ਪ੍ਰਾਪਤ ਕਰਨ ਲਈ ਗਾਹਕ ਤੋਂ 4-ਅੰਕਾਂ ਦਾ OTP ਮੰਗੋ।';
+      'ਕੰਮ ਪੂਰਾ ਕਰਨ ਅਤੇ ਭੁਗਤਾਨ ਲੈਣ ਲਈ ਗਾਹਕ ਦੀ ਸਕ੍ਰੀਨ ਤੇ ਦਿਖ ਰਿਹਾ OTP ਮੰਗੋ।';
 
   @override
   String get browseVerifyComplete => 'ਤਸਦੀਕ ਕਰੋ ਅਤੇ ਕੰਮ ਪੂਰਾ ਕਰੋ';

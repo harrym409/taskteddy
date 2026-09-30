@@ -299,7 +299,8 @@ def send_message(
                   else (text[:120] if text else "Sent a photo"))
     for rid in recipients:
         notify_user(session, rid, f"Message from {sender_name}",
-                    notif_body, emoji="💬")
+                    notif_body, emoji="💬",
+                    notif_type="chat", related_id=conversation_id)
     session.commit()
     session.refresh(message)
 

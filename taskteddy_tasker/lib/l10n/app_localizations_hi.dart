@@ -2021,7 +2021,7 @@ class AppL10nHi extends AppL10n {
 
   @override
   String get browseOtpPrompt =>
-      'कार्य पूर्णता की पुष्टि और भुगतान प्राप्त करने के लिए ग्राहक से 4-अंकों का OTP माँगें।';
+      'कार्य पूर्ण करने और भुगतान पाने के लिए ग्राहक की स्क्रीन पर दिख रहा OTP माँगें।';
 
   @override
   String get browseVerifyComplete => 'सत्यापित करें और कार्य पूरा करें';

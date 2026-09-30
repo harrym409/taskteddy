@@ -3702,7 +3702,7 @@ abstract class AppL10n {
   /// No description provided for @browseOtpPrompt.
   ///
   /// In en, this message translates to:
-  /// **'Ask the customer for the 4-digit OTP to confirm task completion and receive payment.'**
+  /// **'Ask the customer for the completion OTP shown on their screen to confirm the task and receive payment.'**
   String get browseOtpPrompt;
 
   /// No description provided for @browseVerifyComplete.

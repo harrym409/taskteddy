@@ -1317,7 +1317,7 @@
   "browseCancelling": "Cancelling...",
   "browseCancelJob": "Cancel job",
   "browseEnterCompletionOtp": "Enter Completion OTP",
-  "browseOtpPrompt": "Ask the customer for the 4-digit OTP to confirm task completion and receive payment.",
+  "browseOtpPrompt": "Ask the customer for the completion OTP shown on their screen to confirm the task and receive payment.",
   "browseVerifyComplete": "Verify & Complete Task",
   "browseReasonEmergency": "Emergency",
   "browseReasonTooFar": "Too far",

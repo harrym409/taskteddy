@@ -2014,7 +2014,7 @@ class AppL10nEn extends AppL10n {
 
   @override
   String get browseOtpPrompt =>
-      'Ask the customer for the 4-digit OTP to confirm task completion and receive payment.';
+      'Ask the customer for the completion OTP shown on their screen to confirm the task and receive payment.';
 
   @override
   String get browseVerifyComplete => 'Verify & Complete Task';

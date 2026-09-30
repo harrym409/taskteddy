@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ErrorBanner, SuccessBanner } from "@/components/ui/feedback";
 import { cn } from "@/lib/utils";
-import { sendAnnouncement } from "@/lib/api";
+import { sendAnnouncement, sendNotification } from "@/lib/api";
 import { AnnouncementAudience } from "@/types";
 import { Bell, Megaphone, Send, Store, UserRound, UsersRound } from "lucide-react";
 
@@ -27,6 +27,7 @@ const BODY_MAX = 1000;
 
 export default function AnnouncementsPage() {
   const [audience, setAudience] = useState<AnnouncementAudience>("all");
+  const [notifType, setNotifType] = useState("announcement");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [confirming, setConfirming] = useState(false);
@@ -41,14 +42,29 @@ export default function AnnouncementsPage() {
     setSending(true);
     setError(null);
     try {
-      const result = await sendAnnouncement({
-        title: title.trim(),
-        body: body.trim(),
-        audience,
-      });
+      let recipients: number;
+      let pushed = 0;
+      if (notifType === "announcement") {
+        const result = await sendAnnouncement({
+          title: title.trim(),
+          body: body.trim(),
+          audience,
+        });
+        recipients = result.recipients;
+        pushed = result.pushed ?? 0;
+      } else {
+        // Typed, deep-linking alert (e.g. verify_email opens the verify flow).
+        const result = await sendNotification({
+          title: title.trim(),
+          body: body.trim(),
+          type: notifType,
+          audience,
+        });
+        recipients = result.recipients;
+      }
       setSuccess(
-        `Sent to ${result.recipients} recipient${result.recipients === 1 ? "" : "s"}` +
-          (result.pushed > 0 ? ` (${result.pushed} push notifications delivered)` : "")
+        `Sent to ${recipients} recipient${recipients === 1 ? "" : "s"}` +
+          (pushed > 0 ? ` (${pushed} push notifications delivered)` : "")
       );
       setTitle("");
       setBody("");
@@ -101,6 +117,26 @@ export default function AnnouncementsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                Alert type (deep-link)
+              </label>
+              <select
+                value={notifType}
+                onChange={(e) => setNotifType(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800"
+              >
+                <option value="announcement">Announcement (no redirect)</option>
+                <option value="verify_email">
+                  Verify email — opens email verification
+                </option>
+                <option value="bonus">Bonus — opens the bonus screen</option>
+              </select>
+              <p className="mt-1 text-xs text-slate-400">
+                When a user taps the alert, the app opens the matching screen.
+              </p>
             </div>
 
             <div>

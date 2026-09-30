@@ -16,6 +16,10 @@ import '../services/api_service.dart';
 import 'other.dart';
 import 'tasks.dart';
 
+/// Bumped by the shell when the Home tab is tapped again while already on Home,
+/// so the home screen re-fetches its data (a "tap Home twice to refresh" gesture).
+final ValueNotifier<int> homeTabRetap = ValueNotifier<int>(0);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
   @override
@@ -48,10 +52,18 @@ class _HomeState extends State<HomeScreen>
     _loadChatUnreadCount();
     _detectAndSetLocation();
     WidgetsBinding.instance.addObserver(this);
+    homeTabRetap.addListener(_onHomeRetap);
     _unreadTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _loadUnreadCount();
       _loadChatUnreadCount();
     });
+  }
+
+  void _onHomeRetap() {
+    if (!mounted) return;
+    _loadData();
+    _loadUnreadCount();
+    _loadChatUnreadCount();
   }
 
   @override
@@ -78,6 +90,7 @@ class _HomeState extends State<HomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    homeTabRetap.removeListener(_onHomeRetap);
     _unreadTimer?.cancel();
     super.dispose();
   }
@@ -243,23 +256,53 @@ class _HomeState extends State<HomeScreen>
     );
   }
 
+  static bool _looksLikePlusCode(String s) =>
+      RegExp(r'^[A-Z0-9]{2,}\+[A-Z0-9]{2,}').hasMatch(s.trim());
+
   String? _locationLabelFromPlacemark(List<Placemark> places) {
     if (places.isEmpty) return null;
     final place = places.first;
-    final city = [
-      place.subLocality,
-      place.locality,
-      place.subAdministrativeArea,
-    ]
+
+    // Street portion: "<number> <street>", or the place name when that's more
+    // specific than the raw street (and not a Plus Code).
+    final street = [place.subThoroughfare, place.thoroughfare]
         .whereType<String>()
-        .firstWhere((value) => value.trim().isNotEmpty, orElse: () => '');
-    final state = place.administrativeArea ?? '';
-    final country = place.country ?? '';
-    final parts = [city, state.isNotEmpty ? state : country]
-        .where((value) => value.trim().isNotEmpty)
-        .toSet()
-        .toList();
-    return parts.isEmpty ? null : parts.join(', ');
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .join(' ')
+        .trim();
+    String head = street;
+    final name = (place.name ?? '').trim();
+    if (head.isEmpty &&
+        name.isNotEmpty &&
+        name != place.thoroughfare &&
+        !_looksLikePlusCode(name)) {
+      head = name;
+    }
+
+    final area = (place.subLocality ?? '').trim();
+    final city =
+        (place.locality ?? place.subAdministrativeArea ?? '').trim();
+    final state = (place.administrativeArea ?? '').trim();
+    final country = (place.country ?? '').trim();
+
+    // Build "street, area, city, state" — de-duplicated, skipping blanks.
+    final parts = <String>[];
+    void add(String v) {
+      final t = v.trim();
+      if (t.isNotEmpty && !parts.any((p) => p.toLowerCase() == t.toLowerCase())) {
+        parts.add(t);
+      }
+    }
+
+    add(head);
+    add(area);
+    add(city);
+    add(state.isNotEmpty ? state : country);
+
+    if (parts.isEmpty) return null;
+    // Keep the header readable — at most 4 segments.
+    return parts.take(4).join(', ');
   }
 
   /// Load the customer's own tasks + bookings (and the review-handled set)
@@ -307,167 +350,237 @@ class _HomeState extends State<HomeScreen>
     return Icons.nightlight_round;
   }
 
+  // Expanded/collapsed content heights (below the status bar).
+  static const double _headerExpandedH = 100;
+  static const double _headerCollapsedH = 52;
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: C.bg,
-        body: GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusScope.of(context).unfocus(),
-          child: Column(
-            children: [
-              _header(),
-              Expanded(
-                child: RefreshIndicator(
-                  color: C.primary,
-                  onRefresh: _loadData,
-                  child: CustomScrollView(
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    physics: const BouncingScrollPhysics(),
-                    slivers: [
-                      SliverToBoxAdapter(child: _heroPostCard()),
-                      SliverToBoxAdapter(
-                        child: _PromoCarousel(
-                          onPost: (cat) => _openPostTask(category: cat),
-                        ),
-                      ),
-                      SliverToBoxAdapter(child: _activeStatusCard()),
-                      SliverToBoxAdapter(child: _ratePromptCard()),
-                      SliverToBoxAdapter(child: _howItWorks()),
-                      SliverToBoxAdapter(child: _needHelpSection()),
-                      SliverToBoxAdapter(child: _recentTasksSection()),
-                      SliverToBoxAdapter(child: _trustStrip()),
-                      const SliverToBoxAdapter(child: _BrandFooter()),
-                      const SliverToBoxAdapter(child: SizedBox(height: 28)),
-                    ],
-                  ),
+  Widget build(BuildContext context) {
+    final topPad = MediaQuery.of(context).padding.top;
+    return Scaffold(
+      backgroundColor: C.bg,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: RefreshIndicator(
+          color: C.primary,
+          onRefresh: _loadData,
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                pinned: true,
+                automaticallyImplyLeading: false,
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                expandedHeight: _headerExpandedH + topPad,
+                toolbarHeight: _headerCollapsedH,
+                flexibleSpace: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final maxE = _headerExpandedH + topPad;
+                    final minE = _headerCollapsedH + topPad;
+                    final t = ((constraints.maxHeight - minE) / (maxE - minE))
+                        .clamp(0.0, 1.0);
+                    return _headerShell(t, topPad);
+                  },
                 ),
               ),
+              SliverToBoxAdapter(child: _heroPostCard()),
+              SliverToBoxAdapter(
+                child: _PromoCarousel(
+                  onPost: (cat) => _openPostTask(category: cat),
+                ),
+              ),
+              SliverToBoxAdapter(child: _activeStatusCard()),
+              SliverToBoxAdapter(child: _ratePromptCard()),
+              SliverToBoxAdapter(child: _howItWorks()),
+              SliverToBoxAdapter(child: _needHelpSection()),
+              SliverToBoxAdapter(child: _recentTasksSection()),
+              SliverToBoxAdapter(child: _trustStrip()),
+              const SliverToBoxAdapter(child: _BrandFooter()),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
             ],
           ),
         ),
-      );
+      ),
+    );
+  }
 
-  // ── HEADER with gradient ─────────────────────────────────────
-  Widget _header() => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [C.primary, C.primaryDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(28),
-            bottomRight: Radius.circular(28),
-          ),
+  // ── Collapsing gradient header ───────────────────────────────
+  // t = 1 fully expanded → 0 fully collapsed; the two layers cross-fade.
+  Widget _headerShell(double t, double topPad) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [C.primary, C.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      height: 42,
-                      width: 154,
-                      alignment: Alignment.centerLeft,
-                      child: Image.asset(
-                        'assets/images/logo_wordmark.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        _IconBtn(
-                          icon: Icons.notifications_outlined,
-                          badge: _unreadCount > 0
-                              ? (_unreadCount > 99
-                                  ? '99+'
-                                  : '$_unreadCount')
-                              : null,
-                          onTap: _openNotifications,
-                        ),
-                        const SizedBox(width: 8),
-                        _IconBtn(
-                          icon: Icons.chat_bubble_outline,
-                          badge: _chatUnreadCount > 0
-                              ? (_chatUnreadCount > 99
-                                  ? '99+'
-                                  : '$_chatUnreadCount')
-                              : null,
-                          onTap: _openMessages,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(_greetingIcon,
-                        size: 15,
-                        color: Colors.white.withValues(alpha: 0.9)),
-                    const SizedBox(width: 6),
-                    Text(
-                      _greetingText(context),
-                      style: GoogleFonts.poppins(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                InkWell(
-                  onTap: _openLocationPicker,
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        _detectingLocation
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white70,
-                                ),
-                              )
-                            : const Icon(Icons.location_on,
-                                color: Colors.white70, size: 16),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _locationLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Icon(Icons.keyboard_arrow_down,
-                            color: Colors.white, size: 20),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _detectAndSetLocation,
-                          child: const Icon(Icons.my_location,
-                              color: Colors.white, size: 18),
-                        ),
-                      ],
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: C.primaryDark.withValues(alpha: 0.18 + 0.10 * (1 - t)),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.only(top: topPad),
+      child: Stack(
+        children: [
+          // Expanded layer (wordmark + greeting + location)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: t < 0.5,
+              child: Opacity(
+                opacity: t,
+                child: ClipRect(
+                  child: OverflowBox(
+                    alignment: Alignment.topCenter,
+                    minHeight: 0,
+                    maxHeight: _headerExpandedH,
+                    child: SizedBox(
+                      height: _headerExpandedH,
+                      child: _headerExpanded(),
                     ),
                   ),
                 ),
+              ),
+            ),
+          ),
+          // Collapsed layer (compact location + icons)
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: t >= 0.5,
+              child: Opacity(opacity: 1 - t, child: _headerCollapsed()),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerExpanded() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                SizedBox(
+                  height: 38,
+                  width: 150,
+                  child: Image.asset('assets/images/logo_wordmark.png',
+                      fit: BoxFit.contain, alignment: Alignment.centerLeft),
+                ),
+                Row(children: [
+                  _IconBtn(
+                    icon: Icons.notifications_outlined,
+                    badge: _unreadCount > 0
+                        ? (_unreadCount > 99 ? '99+' : '$_unreadCount')
+                        : null,
+                    onTap: _openNotifications,
+                  ),
+                  const SizedBox(width: 8),
+                  _IconBtn(
+                    icon: Icons.chat_bubble_outline,
+                    badge: _chatUnreadCount > 0
+                        ? (_chatUnreadCount > 99 ? '99+' : '$_chatUnreadCount')
+                        : null,
+                    onTap: _openMessages,
+                  ),
+                ]),
               ],
             ),
+            const SizedBox(height: 3),
+            Row(children: [
+              Icon(_greetingIcon,
+                  size: 15, color: Colors.white.withValues(alpha: 0.9)),
+              const SizedBox(width: 6),
+              Text(_greetingText(context),
+                  style: GoogleFonts.poppins(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500)),
+            ]),
+            const SizedBox(height: 2),
+            _locationRow(),
+          ],
+        ),
+      );
+
+  Widget _headerCollapsed() => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            SizedBox(
+              height: 34,
+              width: 132,
+              child: Image.asset('assets/images/logo_wordmark.png',
+                  fit: BoxFit.contain, alignment: Alignment.centerLeft),
+            ),
+            const Spacer(),
+            _IconBtn(
+              icon: Icons.notifications_outlined,
+              badge: _unreadCount > 0
+                  ? (_unreadCount > 99 ? '99+' : '$_unreadCount')
+                  : null,
+              onTap: _openNotifications,
+            ),
+            const SizedBox(width: 8),
+            _IconBtn(
+              icon: Icons.chat_bubble_outline,
+              badge: _chatUnreadCount > 0
+                  ? (_chatUnreadCount > 99 ? '99+' : '$_chatUnreadCount')
+                  : null,
+              onTap: _openMessages,
+            ),
+          ],
+        ),
+      );
+
+  Widget _locationRow() => InkWell(
+        onTap: _openLocationPicker,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            children: [
+              _detectingLocation
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: Colors.white70))
+                  : const Icon(Icons.location_on,
+                      color: Colors.white70, size: 16),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  _locationLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down,
+                  color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: _detectAndSetLocation,
+                child: const Icon(Icons.my_location,
+                    color: Colors.white, size: 18),
+              ),
+            ],
           ),
         ),
       );
@@ -1963,7 +2076,7 @@ class _PromoCarouselState extends State<_PromoCarousel> {
   @override
   void initState() {
     super.initState();
-    _pc = PageController(viewportFraction: 0.9);
+    _pc = PageController(viewportFraction: 1.0);
     _timer = Timer.periodic(const Duration(milliseconds: 4500), (_) {
       if (!_pc.hasClients) return;
       final next = (_page + 1) % _promos.length;
@@ -2019,7 +2132,7 @@ class _PromoCarouselState extends State<_PromoCarousel> {
   }
 
   Widget _card(_Promo p) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: GestureDetector(
           onTap: () => widget.onPost(p.category),
           child: Container(

@@ -264,8 +264,12 @@ class _AppList extends StatelessWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
-              child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              // Bias slightly above the content-area centre so, with the tall
+              // header above, the empty state reads as centred on screen.
+              child: Align(
+                alignment: const Alignment(0, -0.18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
                       width: 72,
@@ -282,12 +286,14 @@ class _AppList extends StatelessWidget {
                         style: GoogleFonts.nunito(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: T.text3)),
+                            color: T.text2)),
                     const SizedBox(height: 6),
                     Text(l.profileBrowseTasksStart,
                         style:
                             GoogleFonts.nunito(fontSize: 14, color: T.text3)),
-                  ]),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

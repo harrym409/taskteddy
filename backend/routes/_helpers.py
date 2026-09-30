@@ -353,7 +353,7 @@ def release_pending_tasks(session) -> int:
         t.updated_at = _dt.utcnow()
         notify_user(session, t.posted_by, "Task approved",
                     f"'{t.title}' passed review and is now live for taskers.",
-                    emoji="✅")
+                    emoji="✅", notif_type="task", related_id=t.id)
     session.commit()
     # Newly-live tasks: notify taskers in each region + refresh browse feeds.
     try:
@@ -424,7 +424,7 @@ def grant_signup_bonus_if_eligible(session, user) -> float:
     try:
         notify_user(session, user.id, "🎁 ₹500 bonus unlocked!",
                     f"Your TaskTeddy welcome bonus of ₹{SIGNUP_BONUS:.0f} is ready — "
-                    "save up to 10% on every task.", emoji="🎁")
+                    "save up to 10% on every task.", emoji="🎁", notif_type="bonus")
     except Exception:
         pass
     return float(SIGNUP_BONUS)
@@ -536,7 +536,8 @@ def notify_taskers_of_new_task(session, task, radius_km: float = 40.0) -> None:
                 body = f"'{task.title}' posted ~{d:.0f} km away · ₹{budget:.0f}."
             else:
                 body = f"'{task.title}' is now available · ₹{budget:.0f}."
-            notify_user(session, t.id, "New task nearby", body, emoji="🆕")
+            notify_user(session, t.id, "New task nearby", body, emoji="🆕",
+                        notif_type="task_available", related_id=task.id)
             notified += 1
         if notified:
             session.commit()
@@ -544,8 +545,14 @@ def notify_taskers_of_new_task(session, task, radius_km: float = 40.0) -> None:
         pass
 
 
-def notify_user(session, user_id: str, title: str, body: str, emoji: str = "💰") -> None:
-    """Insert an in-app notification (committed with the caller's commit)."""
+def notify_user(session, user_id: str, title: str, body: str, emoji: str = "💰",
+                notif_type: str = "general", related_id: str | None = None) -> None:
+    """Insert an in-app notification (committed with the caller's commit).
+
+    ``notif_type`` + ``related_id`` let the apps deep-link when the alert is
+    tapped, e.g. type="bid"/"task" with the task id, "chat" with a conversation
+    id, "verify_email"/"bonus" for account prompts.
+    """
     import uuid as _uuid
     from datetime import datetime as _dt
 
@@ -557,7 +564,8 @@ def notify_user(session, user_id: str, title: str, body: str, emoji: str = "💰
         title=title,
         body=body,
         emoji=emoji,
-        type="payment",
+        type=notif_type,
+        related_id=related_id,
         is_read=False,
         created_at=_dt.utcnow(),
     ))

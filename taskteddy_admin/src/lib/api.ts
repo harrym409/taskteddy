@@ -353,6 +353,29 @@ export async function sendAnnouncement(
   return handleResponse<AnnouncementResult>(res);
 }
 
+/**
+ * Send a typed, deep-linking notification to one user or an audience. The
+ * `type` (e.g. "verify_email", "bonus") tells the app which screen to open when
+ * the alert is tapped.
+ */
+export async function sendNotification(data: {
+  title: string;
+  body: string;
+  type: string;
+  audience?: "all" | "customers" | "taskers";
+  user_id?: string;
+  related_id?: string;
+}): Promise<{ message: string; recipients: number; type: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/notify`, {
+    method: "POST",
+    headers: await getAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+  return handleResponse<{ message: string; recipients: number; type: string }>(
+    res
+  );
+}
+
 // ========== TASKS ==========
 
 export async function getTasks(status?: string, search?: string) {

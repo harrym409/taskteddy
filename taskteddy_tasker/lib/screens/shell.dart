@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/theme.dart';
 import '../l10n/app_localizations.dart';
+import '../models/models.dart';
+import '../services/api_service.dart';
 import 'dashboard.dart';
 import 'browse.dart';
 import 'profile.dart';
@@ -21,6 +23,8 @@ class MainShell extends StatefulWidget {
 class _ShellState extends State<MainShell> {
   int _idx = 0;
   final TaskerState _state = TaskerState();
+  int _appliedCount = 0; // active accepted jobs → badge on the Applied tab
+  Timer? _countTimer;
 
   final List<Widget> _screens = const [
     DashboardScreen(),
@@ -43,14 +47,36 @@ class _ShellState extends State<MainShell> {
       if (e['type'] == 'applications.changed') {
         _state.notifyApplicationsChanged();
       }
+      _loadAppliedCount();
     });
+    _loadAppliedCount();
+    _countTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _loadAppliedCount());
   }
 
   @override
   void dispose() {
     _rtSub?.cancel();
+    _countTimer?.cancel();
     _state.removeListener(_onStateChange);
     super.dispose();
+  }
+
+  Future<void> _loadAppliedCount() async {
+    try {
+      final apps = await ApiService.getMyApplications();
+      if (!mounted) return;
+      final n = apps
+          .where((a) =>
+              a.status == 'accepted' &&
+              a.task != null &&
+              (a.task!.status == TaskStatus.assigned ||
+                  a.task!.status == TaskStatus.inProgress))
+          .length;
+      if (n != _appliedCount) setState(() => _appliedCount = n);
+    } catch (_) {
+      // Best-effort badge.
+    }
   }
 
   // Honour a tab-switch request from anywhere (e.g. "View My Applications").
@@ -95,7 +121,14 @@ class _ShellState extends State<MainShell> {
                     activeIcon: Icons.home_rounded,
                     label: l.navHome,
                     active: _idx == 0,
-                    onTap: () => setState(() => _idx = 0),
+                    onTap: () {
+                      // Re-tapping Home while already on it refreshes it.
+                      if (_idx == 0) {
+                        dashboardTabRetap.value++;
+                      } else {
+                        setState(() => _idx = 0);
+                      }
+                    },
                   ),
                   _NavItem(
                     icon: Icons.search_outlined,
@@ -109,6 +142,9 @@ class _ShellState extends State<MainShell> {
                     activeIcon: Icons.assignment_rounded,
                     label: l.navApplied,
                     active: _idx == 2,
+                    badge: _appliedCount > 0
+                        ? (_appliedCount > 99 ? '99+' : '$_appliedCount')
+                        : null,
                     onTap: () => setState(() => _idx = 2),
                   ),
                   _NavItem(

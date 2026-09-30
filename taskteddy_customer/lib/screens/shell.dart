@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/theme.dart';
+import '../models/models.dart';
+import '../services/api_service.dart';
 import 'home.dart';
 import 'tasks.dart';
 import 'profile.dart';
@@ -17,6 +20,9 @@ class MainShell extends StatefulWidget {
 class _ShellState extends State<MainShell> {
   late int _i;
   static const _tabCount = 5;
+  int _activeCount = 0; // in-progress jobs → badge on the Active tab
+  Timer? _countTimer;
+  StreamSubscription? _rtSub;
 
   List<Widget> get _screens => [
         const HomeScreen(),
@@ -42,6 +48,33 @@ class _ShellState extends State<MainShell> {
     super.initState();
     _i = widget.initialIndex.clamp(0, _tabCount - 1);
     RealtimeService().start(); // live bid updates on task detail
+    _loadActiveCount();
+    _countTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _loadActiveCount());
+    // A bid accepted / task moving forward changes the active count — refresh.
+    _rtSub = RealtimeService().events.listen((_) => _loadActiveCount());
+  }
+
+  @override
+  void dispose() {
+    _countTimer?.cancel();
+    _rtSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadActiveCount() async {
+    try {
+      final tasks = await ApiService.getTasks();
+      if (!mounted) return;
+      final n = tasks
+          .where((t) =>
+              t.status == TaskStatus.assigned ||
+              t.status == TaskStatus.inProgress)
+          .length;
+      if (n != _activeCount) setState(() => _activeCount = n);
+    } catch (_) {
+      // Best-effort badge; leave the last value on failure.
+    }
   }
 
   @override
@@ -99,8 +132,19 @@ class _ShellState extends State<MainShell> {
         label: _navLabels(context)[i],
         active: _i == i,
         center: i == 2,
-        onTap: () => setState(() => _i = i),
+        badge: i == 3 ? _activeCount : 0, // Active tab count
+        onTap: () => _onTapTab(i),
       );
+
+  void _onTapTab(int i) {
+    // Tapping the Home tab again while already on Home refreshes it.
+    if (i == _i) {
+      if (i == 0) homeTabRetap.value++;
+      return;
+    }
+    setState(() => _i = i);
+    _loadActiveCount();
+  }
 
   static const _navIcons = [
     Icons.home_outlined,
@@ -136,6 +180,7 @@ class _NavBtn extends StatelessWidget {
   final String label;
   final bool active;
   final bool center;
+  final int badge;
   final VoidCallback onTap;
 
   const _NavBtn({
@@ -144,6 +189,7 @@ class _NavBtn extends StatelessWidget {
     required this.label,
     required this.active,
     required this.center,
+    this.badge = 0,
     required this.onTap,
   });
 
@@ -195,20 +241,51 @@ class _NavBtn extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? C.primary.withValues(alpha: 0.1)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        active ? activeIcon : icon,
-                        size: 23,
-                        color: active ? C.primary : C.text3,
-                      ),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: active
+                                ? C.primary.withValues(alpha: 0.1)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            active ? activeIcon : icon,
+                            size: 23,
+                            color: active ? C.primary : C.text3,
+                          ),
+                        ),
+                        if (badge > 0)
+                          Positioned(
+                            right: -1,
+                            top: -1,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              constraints: const BoxConstraints(minWidth: 18),
+                              decoration: BoxDecoration(
+                                color: C.accent2,
+                                borderRadius: BorderRadius.circular(999),
+                                border:
+                                    Border.all(color: Colors.white, width: 1.5),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  badge > 99 ? '99+' : '$badge',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 4),
                     Text(

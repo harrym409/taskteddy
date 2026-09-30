@@ -95,7 +95,7 @@ def create_application(
     task.updated_at = now
     notify_user(session, task.posted_by, "New Application",
                 f"A tasker bid ₹{float(data.bid_amount):.0f} on '{task.title}'.",
-                emoji="📥")
+                emoji="📥", notif_type="bid", related_id=task.id)
     session.commit()
     session.refresh(application)
     # Live push: nudge the customer's task-detail to refetch offers instantly.
@@ -181,7 +181,8 @@ def accept_application(
     task.assigned_to = application.applicant_id
     task.updated_at = now
     if not task.completion_otp:
-        task.completion_otp = str(random.randint(1000, 9999))
+        # 6-digit completion OTP (matches login/email OTPs and both apps' UI).
+        task.completion_otp = str(random.randint(100000, 999999))
 
     others = session.execute(
         select(Application).where(
@@ -194,10 +195,11 @@ def accept_application(
 
     notify_user(session, application.applicant_id, "You Got the Job!",
                 f"Your bid on '{task.title}' was accepted. Chat with the customer to coordinate.",
-                emoji="🎉")
+                emoji="🎉", notif_type="task", related_id=task.id)
     for other in others:
         notify_user(session, other.applicant_id, "Application Update",
-                    f"'{task.title}' has been assigned to another tasker.", emoji="📋")
+                    f"'{task.title}' has been assigned to another tasker.",
+                    emoji="📋", notif_type="applied")
     session.commit()
     # Live push: refresh every affected tasker's "My Applications" instantly,
     # and the task is no longer open so nudge the browse feeds too.

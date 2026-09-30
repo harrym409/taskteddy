@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/theme.dart';
 import '../theme/app_theme.dart';
 import '../services/api_service.dart';
+import '../services/tasker_state.dart';
 import '../l10n/app_localizations.dart';
 
 /// In-app notification center, styled to the tasker "work console" look:
@@ -74,6 +75,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       await ApiService.markNotificationRead(id);
     } catch (_) {}
+  }
+
+  /// Mark read and deep-link to the relevant screen/tab based on type.
+  Future<void> _onTap(Map<String, dynamic> n) async {
+    await _markRead(n);
+    if (!mounted) return;
+    final type = (n['type'] ?? '').toString();
+    switch (type) {
+      case 'chat':
+        Navigator.pushNamed(context, '/messages');
+        break;
+      case 'task_available':
+      case 'bid':
+        Navigator.pop(context); // back to the shell
+        TaskerState().requestTab(1); // Browse
+        break;
+      case 'task':
+      case 'applied':
+        Navigator.pop(context);
+        TaskerState().requestTab(2); // Applied
+        break;
+      default:
+        break; // announcements / general — nothing to open
+    }
   }
 
   Future<void> _delete(Map<String, dynamic> n) async {
@@ -167,7 +192,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       onDismissed: (_) => _delete(n),
       child: GestureDetector(
-        onTap: () => _markRead(n),
+        onTap: () => _onTap(n),
         child: Container(
           padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(

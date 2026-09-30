@@ -7,6 +7,8 @@ import '../theme/theme.dart';
 import '../theme/category_icons.dart';
 import '../models/models.dart';
 import 'service_detail.dart';
+import 'tasks.dart';
+import 'profile.dart';
 
 /// Localized, human-readable label for a booking status wire value.
 String bookingStatusLabel(AppL10n l, String status) {
@@ -769,6 +771,39 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     await ApiService.markNotificationRead(item.remoteId!);
   }
 
+  /// Tapping an alert marks it read and deep-links to the relevant screen
+  /// based on its type + related id.
+  Future<void> _onNotifTap(NotifModel n) async {
+    await _markOneRead(n);
+    if (!mounted) return;
+    final id = n.relatedId;
+    switch (n.type) {
+      case 'verify_email':
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const ClaimBonusScreen()));
+        break;
+      case 'bonus':
+        await Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const TaskTeddyBonusScreen()));
+        break;
+      case 'chat':
+        await Navigator.pushNamed(context, '/messages');
+        break;
+      case 'task':
+      case 'bid':
+      case 'task_available':
+        if (id != null && id.isNotEmpty) {
+          final task = await ApiService.getTaskById(id);
+          if (!mounted || task == null) return;
+          await Navigator.push(context,
+              MaterialPageRoute(builder: (_) => TaskDetailScreen(task: task)));
+        }
+        break;
+      default:
+        break; // announcements / general — nothing to open
+    }
+  }
+
   Future<void> _delete(NotifModel item) async {
     setState(() =>
         _items = _items.where((n) => n.remoteId != item.remoteId).toList());
@@ -826,7 +861,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             ),
                             child: _NotifCard(
                               n: n,
-                              onTap: () => _markOneRead(n),
+                              onTap: () => _onNotifTap(n),
                             ),
                           );
                         }),

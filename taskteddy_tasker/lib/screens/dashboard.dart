@@ -15,6 +15,10 @@ import 'browse.dart';
 import 'wallet.dart';
 import 'notifications.dart';
 
+/// Bumped by the shell when the Home tab is tapped again while already on Home,
+/// so the dashboard re-fetches its data ("tap Home twice to refresh").
+final ValueNotifier<int> dashboardTabRetap = ValueNotifier<int>(0);
+
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
   @override
@@ -49,6 +53,14 @@ class _DashboardState extends State<DashboardScreen> {
     _loadUnreadCount();
     _loadChatUnread();
     _startNotifPolling();
+    dashboardTabRetap.addListener(_onHomeRetap);
+  }
+
+  void _onHomeRetap() {
+    if (!mounted) return;
+    _loadData();
+    _loadUnreadCount();
+    _loadChatUnread();
   }
 
   Future<void> _loadUnreadCount() async {
@@ -141,6 +153,7 @@ class _DashboardState extends State<DashboardScreen> {
   void dispose() {
     _notifTimer?.cancel();
     _state.removeListener(_onStateChange);
+    dashboardTabRetap.removeListener(_onHomeRetap);
     super.dispose();
   }
 
@@ -532,34 +545,42 @@ class _DashboardState extends State<DashboardScreen> {
   Widget _buildStatsRow() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
+      child: Column(
         children: [
-          _StatChip(
-            icon: Icons.star_rounded,
-            value: _state.user.rating.toStringAsFixed(1),
-            label: _l.statRating,
-            color: T.star,
+          Row(
+            children: [
+              _StatChip(
+                icon: Icons.star_rounded,
+                value: _state.user.rating.toStringAsFixed(1),
+                label: _l.statRating,
+                color: T.star,
+              ),
+              const SizedBox(width: 10),
+              _StatChip(
+                icon: Icons.check_circle_rounded,
+                value: '$_completedJobs',
+                label: _l.statTasks,
+                color: T.green,
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _StatChip(
-            icon: Icons.check_circle_rounded,
-            value: '$_completedJobs',
-            label: _l.statTasks,
-            color: T.green,
-          ),
-          const SizedBox(width: 8),
-          _StatChip(
-            icon: Icons.verified_rounded,
-            value: '$_reliability%',
-            label: _l.dashStatReliability,
-            color: T.blue,
-          ),
-          const SizedBox(width: 8),
-          _StatChip(
-            icon: Icons.workspace_premium_rounded,
-            value: _levelLabel,
-            label: _l.dashStatLevel,
-            color: T.gold,
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _StatChip(
+                icon: Icons.verified_rounded,
+                value: '$_reliability%',
+                label: _l.dashStatReliability,
+                color: T.blue,
+              ),
+              const SizedBox(width: 10),
+              _StatChip(
+                icon: Icons.workspace_premium_rounded,
+                value: _levelLabel,
+                label: _l.dashStatLevel,
+                color: T.gold,
+              ),
+            ],
           ),
         ],
       ),
@@ -641,31 +662,57 @@ class _DashboardState extends State<DashboardScreen> {
   Widget _buildPriorityTasks() {
     if (_availableTasks.isEmpty) {
       return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(20),
             border: Border.all(color: T.border),
           ),
           child: Column(
             children: [
-              const Icon(Icons.search_off_rounded, size: 40, color: T.text3),
-              const SizedBox(height: 10),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: const BoxDecoration(
+                  color: T.primaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.travel_explore_rounded,
+                    size: 32, color: T.primary),
+              ),
+              const SizedBox(height: 14),
               Text(
                 _l.noTasksAvailable,
                 style: GoogleFonts.poppins(
-                  color: T.text2,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  color: T.text1,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 _l.dashCheckBackSoon,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(color: T.text3, fontSize: 13),
+                style: GoogleFonts.nunito(
+                    color: T.text3, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => _loadData(),
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(_l.browseRefresh,
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w700)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: T.primary,
+                  side: BorderSide(color: T.primary.withValues(alpha: 0.4)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
               ),
             ],
           ),
@@ -971,34 +1018,59 @@ class _StatChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(color: T.border),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: T.text1,
-                letterSpacing: -0.4,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+          boxShadow: [
+            BoxShadow(
+              color: T.panelDark.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-            const SizedBox(height: 1),
-            Text(
-              label,
-              style: GoogleFonts.nunito(
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                color: T.text3,
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 21),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: T.text1,
+                      letterSpacing: -0.4,
+                      height: 1.05,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    label,
+                    style: GoogleFonts.nunito(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: T.text3,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ],
